@@ -1385,6 +1385,7 @@ class _ClassMemory
             return startAddress + offset
         else return 0
     }
+
     ; Method:               bufferScanForMaskedPattern(&hayStack, sizeOfHayStackBytes, &patternMask, &needle)
     ;                       Scans a binary haystack for binary needle against a pattern mask string using a machine code function.
     ; Parameters:
@@ -1501,7 +1502,7 @@ class _ClassMemory
 
             ;if (!this.HasOwnProp(key))
              ;   this.defineProp(key, {Value: value})
-		        return this.%key%
+		    return this.%key%
         }
         __set(key, params, value)
         {
@@ -1529,7 +1530,7 @@ class _ClassMemory
 
             if (!this.HasOwnProp(key))
                 this.defineProp(key, {Value: value})
-		        this.%key% := value
+		    this.%key% := value
         }
         Ptr()
         {
