@@ -17,21 +17,26 @@
 ; Since ahk is slow for screenshots and getting pixel data, I use an external lib for that thas is 50% or more faster.
 ;   depends on how many pixelGets are done on base ahk, 1 ImageSearch = 2 PixelGetColor (yeah.. that bad)
 ;   the ImagePut lib 1 to X PixelGet = 1 PixelGetColor because is uses a buffer, this should be in the standard lib of ahk really.
-; if I use memory scans it will work on all resolutions but may break on an update. (I made it, works better, but if game updates it may break or change behaviour, discarded the code :( stick with pixels..
+; if I use memory scans it will work on all resolutions but may break on an update. (I made it, works better,
+;   but if game updates it may break or change behaviour, discarded the code :( stick with pixels..
 ; Now using ImagePut library, to uses buffers when scanning for pixels, it uses basic C, so it's fast.
 
 ; -------------
 ; User Options
 ; -------------
 
-useMemScan := True ; Uses memory scans to check for open menus to unlock and lock the mouse, works on all resolutions but may break on a future update. It's faster can use lower scanMemoryInterval
-; False uses ImagePut library to buffer screenshots to analize the image por pixels belonging to menus, the caveat is it may not be that reliable on some menus, but works petty good overall.
+useMemScan := True
+; Uses memory scans to check for open menus to unlock and lock the mouse, works on all resolutions but may break on a future update.
+;   It's faster and can use lower scanMemoryInterval
+; False uses ImagePut library to buffer screenshots to analize the image por pixels belonging to menus,
+;   the caveat is it may not be that reliable on some menus, but works petty good overall.
 ; False may need a larger scanMemoryInterval (150ms is fine when ussing ImagePut library, the default PixelGet of autohotkey take a screenshot per each Get)
 ; There are many ways to scan for somethig, like FindText library, ImageSearch (need external images) or simply scaning specific pixels on resolutions.
-; Default is true but it needs pointer values, using CheatEngine and comparing pointer maps can get you some results, UnityPlyaer.dll changes less often it contains the game 3d engine (not logic).
+; Default is true but it needs pointer values, using CheatEngine and comparing pointer maps can get you some results,
+;    UnityPlyaer.dll changes less often it contains the core unity 3d engine.
 ; <more notes on pointers below>.
 
-; Can modify these
+
 scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if usesMemScan = False)
 
 ; Use 0.45 to 0.0 (Y axys % on where the mouse will center, 0 is top of the screen)
@@ -89,14 +94,14 @@ Thread "NoTimers", True
 vrObj := VRising("VRising.exe", useMemScan, moduleName, moduleNameOffset, moduleOffsets)
 vrObj.lockAxysLevel := lockMouseOnYaxis
 
-;--------------
-; -- HOTKEYS --
-;--------------
+;---------------
+;--- HOTKEYS ---
+;---------------
 ;
 ; All these hotkeys only work when the game window is active so no need to check on every key press.
 ;
 
-; F1 or End key: Enables or disables the script Suspending timers and hotkeys except F1 End permit reenable
+; F1 or End key: Enables or disables the script Suspending timers and hotkeys except F1 End
 ; https://www.autohotkey.com/docs/v2/lib/Suspend.htm
 #SuspendExempt
 End::
@@ -204,7 +209,9 @@ class VRising
     _useMemScan := True
     _lockAxysLevel := 0.27
     _scanMenusFunc := ""    ; !Important, for SetTimer Off we have to use the same ObjBindMethod that was used to create the timer,
-                            ;   since its not static, it creates a new object on each call.
+    ;   since its not static, it creates a new object on each call.
+    _savedXpos := ""
+    _savedYpos := ""
 
     ; Parameters:
     ;   useMemScan  -   If false, uses PixelGet, this will have to be manually verified depending on resolution but works on all versions (if the pixels don't change)
@@ -242,7 +249,7 @@ class VRising
         ; This is used to suspend or resume de timers that scan for menus ingame.
         this._scanMenusFunc := ObjBindMethod(this, "_ScanMenusTimer")
         this._isInFocus := WinActive("ahk_exe " this.processName)
-        this.SuspendScript(True) ; Start suspended even if the game is open
+        this.SuspendScript(True) ; Start suspended by default TODO: check WinActive and set this.
 
         ; This class will be controlled by external windows events that use WinEventProc calls
         ; We need to enable it when the script starts to detect when the process is closed and when the process is active or restarted
@@ -306,7 +313,7 @@ class VRising
                 return ; If already NOT in focus return.
 
             ; Window Loses Focus, suspend hotkeys and pause scan timers
-            this.SuspendScript(True)
+                this.SuspendScript(True)
         }
     }
 
@@ -328,19 +335,28 @@ class VRising
     ; This only gets called from windows events (when the game is on the foreground and focused)
     _initMemory()
     {
+        static errors := 0
+
         if (!ProcessExist(this.processName))
             throw Error("Init Memory failed, process " this.processName " doesn't exists!")
 
+        retry:
         this._openMemory()
         menuAddress := this._getMenuAddress()
-        if (menuAddress <= 0)
+        if ((menuAddress = "") or (menuAddress <= 0))
         {
             ; An Error, wait more before trying again.
-            ; TODO: exponential backoff
-            MsgBox "Could not find the menuAddress !!! maybe the game code changed, closing handle..."
+            errors += 1
+            if (errors > 10)
+            {
+                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, menuAddress: " menuAddress
+                ExitApp
+            }
             this._closeMemory()
-            return
+            Sleep(1000)
+            GoTo retry
         }
+        errors := 0
         this._menuAddress := menuAddress
     }
 
@@ -352,6 +368,9 @@ class VRising
         this._vrisingMem := ""
         this._hProcess := "" ; Is closed automatically when the _classMemory object is destroyed so it's ivalid now, we delete it.
         this._menuAddress := 0
+
+        this._savedXpos := ""
+        this._savedYpos := ""
     }
 
     ; Opens _ClassMemory object for vrising.exe, if a handle is already opened and valid it does nothing
@@ -392,22 +411,22 @@ class VRising
     ;   -3  - EnumProcessModulesEx failed
     ;   -4  - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
     ;
-/*  --------
-    POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
-    There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address
+    /*  --------
+        POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
+        There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address
 
-    ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = value that hold a byte with depending on wich menu is open
+        ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = value that hold a byte with depending on wich menu is open
 
-    Byte values in game:
-    0x17 = action camera with no menus (no inv, loot, build, plant) open
-    0x19 = TAB menu, K, J open
-    0x18 = ESC menu open
-    0x1A = M menu open
+        Byte values in game:
+        0x17 = action camera with no menus (no inv, loot, build, plant) open
+        0x19 = TAB menu, K, J open
+        0x18 = ESC menu open
+        0x1A = M menu open
 
-    Byte values in Main Menu:
-    0x05 = Main Menu
-    0x03 = Cinamatic
-    0x04 = Options - Play menu - Load game
+        Byte values in Main Menu:
+        0x05 = Main Menu
+        0x03 = Cinamatic
+        0x04 = Options - Play menu - Load game
     */
     _getMenuAddress()
     {
@@ -417,13 +436,13 @@ class VRising
         if ((this._menuAddress != "") and (this._menuAddress > 0))
             return this._menuAddress
 
-    /*
-        Self note: AOB patterns may be searched like this:
+        /*
+            Self note: AOB patterns may be searched like this:
 
-        pattern := vrisingMem.hexStringToPattern("00 00 00 00 00 00 00 00 ?? ?? ?? ?? 00 00 00 00 00 00 00 00 00 00 ?? ?? 00 00 ?? ?? 00 00 00 00 01 00 00 00 00 00 00 00 ?? ?? ?? ?? ?? 01 00 00 F8 01 00 00 02 00 00 00")
-        vrisingMem.stringToPattern("UnityGfxDeviceWorker")
-        address := vrisingMem.processPatternScan(,, pattern*) ; Note the '*'
-        ; Memory Address are returned as an int decimal
+            pattern := vrisingMem.hexStringToPattern("00 00 00 00 00 00 00 00 ?? ?? ?? ?? 00 00 00 00 00 00 00 00 00 00 ?? ?? 00 00 ?? ?? 00 00 00 00 01 00 00 00 00 00 00 00 ?? ?? ?? ?? ?? 01 00 00 F8 01 00 00 02 00 00 00")
+            vrisingMem.stringToPattern("UnityGfxDeviceWorker")
+            address := vrisingMem.processPatternScan(,, pattern*) ; Note the '*'
+            ; Memory Address are returned as an int decimal
         */
 
         ; Positive integer - The module's base/load address (success).
@@ -441,13 +460,21 @@ class VRising
             }
             return moduleBaseAddress
         }
-
-        ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._moduleNameOffset, this._moduleOffsets*)
-        if (ret = "" or ret <= 0)
+        ret := ""
+        try
         {
-            ; TODO: url for issues.
-            MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, ret: " ret
-            return ret
+            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._moduleNameOffset, this._moduleOffsets*)
+            if (ret = "" or ret <= 0)
+            {
+                ; TODO: url for issues.
+                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, ret: " ret
+                return ret
+            }
+        }
+        catch Error as err
+        {
+            ; Maybe the process is being loaded, wait and try again.
+            Sleep(1000)
         }
 
         return ret
@@ -508,7 +535,7 @@ class VRising
                     and (pic[136, 93] = 0xFF414950)
                     and (pic[137, 93] = 0xFF3A4047)
                     and (pic[138, 93] = 0xFF2F353A))
-                return true
+                    return true
 
                 ; Action bar on 1920x1080 (if action bar is not visible then we are in a fullscren menu)
                 ; (left wings on the health globe)
@@ -516,7 +543,7 @@ class VRising
                     and (pic[889, 962] != 0xFF98ABB5)
                     and (pic[890, 963] != 0xFF92A8BB)
                     and (pic[891, 964] != 0xFF91A8B3))
-                return true
+                    return true
             }
             else
             {
@@ -629,9 +656,6 @@ class VRising
         }
     }
 
-    xpos := ""
-    ypos := ""
-
     ; SendEvents are more realiable, no need to Sleep everywhere.
     UnlockCamera()
     {
@@ -639,10 +663,10 @@ class VRising
         {
             SendEvent("{RButton up}")
             this._cameraLocked := false
-            if (this.xpos = "" or this.ypos = "")
+            if (this._savedXpos = "" or this._savedYpos = "")
                 return
             else
-                MouseMove(this.xpos, this.ypos, 0)
+                MouseMove(this._savedXpos, this._savedYpos, 0)
         }
     }
 
@@ -660,8 +684,8 @@ class VRising
         If (!GetKeyState("RButton")) ; Don't lock if the user is using the right click, wait until release
         {
             WinGetPos &Window_X, &Window_Y, &Window_Width, &Window_Height, "A"
-            MouseGetPos &xpos, &ypos ; Save current mouse postion before moving it, so we can restore it later.
-            this.xpos := xpos, this.ypos := ypos
+            MouseGetPos &_savedXpos, &_savedYpos ; Save current mouse postion before moving it, so we can restore it later.
+            this._savedXpos := _savedXpos, this._savedYpos := _savedYpos
             BlockInput "MouseMove"
             MouseMove(Window_Width * 0.5, Window_Height * this._lockAxysLevel, 0) ; Move the mouse it a the top middle
             Sleep(30) ; Needed for some edge cases when releasing some keys rapidly causes mouse to drag the screen.
@@ -678,272 +702,272 @@ class VRising
     }
 }
 
-    ; TODO: rewrite this.. it's not well programmed.
-    ; Converted to ahk v2 by
-    ;   github.com/tekert
-    ;
-    ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=59149
-    ; Below is the original comment:
-    ;
-    ; [Class] WinHook
-    ; Fanatic Guru
-    ; 2019 02 18 v2
-    ;
-    ; Class to set hooks of windows or processes
-    ;
-    ;{============================
-    ;
-    ;	Class (Nested):		WinHook.Shell
-    ;
-    ;		Method:
-    ; 			Add(Func, wTitle:="", wClass:="", wExe:="", Event:=0)
-    ;
-    ;		Desc: Add Shell Hook
-    ;
-    ;   	Parameters:
-    ;		1) {Func}		Function name or Function object to call on event
-    ;   	2) {wTitle}	window Title to watch for event (default = "", all windows)
-    ;   	3) {wClass}	window Class to watch for event (default = "", all windows)
-    ;   	4) {wExe}		window Exe to watch for event (default = "", all windows)
-    ;   	5) {Event}		Event (default = 0, all events)
-    ;
-    ;		Returns: {Index}	index to hook that can be used to Remove hook
-    ;
-    ;				Shell Hook Events:
-    ;				1 = HSHELL_WINDOWCREATED
-    ;				2 = HSHELL_WINDOWDESTROYED
-    ;				3 = HSHELL_ACTIVATESHELLWINDOW
-    ;				4 = HSHELL_WINDOWACTIVATED
-    ;				5 = HSHELL_GETMINRECT
-    ;				6 = HSHELL_REDRAW
-    ;				7 = HSHELL_TASKMAN
-    ;				8 = HSHELL_LANGUAGE
-    ;				9 = HSHELL_SYSMENU
-    ;				10 = HSHELL_ENDTASK
-    ;				11 = HSHELL_ACCESSIBILITYSTATE
-    ;				12 = HSHELL_APPCOMMAND
-    ;				13 = HSHELL_WINDOWREPLACED
-    ;				14 = HSHELL_WINDOWREPLACING
-    ;				32768 = 0x8000 = HSHELL_HIGHBIT
-    ;				32772 = 0x8000 + 4 = 0x8004 = HSHELL_RUDEAPPACTIVATED (HSHELL_HIGHBIT + HSHELL_WINDOWACTIVATED)
-    ;				32774 = 0x8000 + 6 = 0x8006 = HSHELL_FLASH (HSHELL_HIGHBIT + HSHELL_REDRAW)
-    ;
-    ;		Note: ObjBindMethod(obj, Method) can be used to create a function object to a class method
-    ;					WinHook.Shell.Add(ObjBindMethod(TestClass.TestNestedClass, "MethodName"), wTitle, wClass, wExe, Event)
-    ;
-    ; ----------
-    ;
-    ;		Desc: Function Called on Event
-    ;			FuncOrMethod(Win_Hwnd, Win_Title, Win_Class, Win_Exe, Win_Event)
-    ;
-    ;		Parameters:
-    ;		1) {Win_Hwnd}		window handle ID of window with event
-    ;   	2) {Win_Title}		window Title of window with event
-    ;   	3) {Win_Class}		window Class of window with event
-    ;   	4) {Win_Exe}			window Exe of window with event
-    ;   	5) {Win_Event}		window Event
-    ;
-    ;		Note: FuncOrMethod will be called with DetectHiddenWindows On.
-    ;
-    ; --------------------
-    ;
-    ;		Method: 	Report(ByRef Object)
-    ;
-    ;		Desc: 		Report Shell Hooks
-    ;
-    ;		Returns:	string report
-    ;						ByRef	Object[Index].{Func, Title:, Class, Exe, Event}
-    ;
-    ; --------------------
-    ;
-    ;		Method:		Remove(Index)
-    ;		Method:		Deregister()
-    ;
-    ;{============================
-    ;
-    ;	Class (Nested):		WinHook.Event
-    ;
-    ;		Method:
-    ;			Add(eventMin, eventMax, eventProc, idProcess, WinTitle := "")
-    ;
-    ;		Desc: Add Event Hook
-    ;
-    ;   	Parameters:
-    ;		1) {eventMin}		lowest Event value handled by the hook function
-    ;   	2) {eventMax}		highest event value handled by the hook function
-    ;   	3) {eventProc}		event hook function, call be function name or function object
-    ;   	4) {idProcess}		ID of the process from which the hook function receives events (default = 0, all processes)
-    ;   	5) {WinTitle}			WinTitle to identify which windows to operate on, (default = "", all windows)
-    ;
-    ;		Returns: {hWinEventHook}	handle to hook that can be used to unhook
-    ;
-    ;				Event Hook Events:
-    ;				0x8012 = EVENT_OBJECT_ACCELERATORCHANGE
-    ;				0x8017 = EVENT_OBJECT_CLOAKED
-    ;				0x8015 = EVENT_OBJECT_CONTENTSCROLLED
-    ;				0x8000 = EVENT_OBJECT_CREATE
-    ;				0x8011 = EVENT_OBJECT_DEFACTIONCHANGE
-    ;				0x800D = EVENT_OBJECT_DESCRIPTIONCHANGE
-    ;				0x8001 = EVENT_OBJECT_DESTROY
-    ;				0x8021 = EVENT_OBJECT_DRAGSTART
-    ;				0x8022 = EVENT_OBJECT_DRAGCANCEL
-    ;				0x8023 = EVENT_OBJECT_DRAGCOMPLETE
-    ;				0x8024 = EVENT_OBJECT_DRAGENTER
-    ;				0x8025 = EVENT_OBJECT_DRAGLEAVE
-    ;				0x8026 = EVENT_OBJECT_DRAGDROPPED
-    ;				0x80FF = EVENT_OBJECT_END
-    ;				0x8005 = EVENT_OBJECT_FOCUS
-    ;				0x8010  = EVENT_OBJECT_HELPCHANGE
-    ;				0x8003 = EVENT_OBJECT_HIDE
-    ;				0x8020 = EVENT_OBJECT_HOSTEDOBJECTSINVALIDATED
-    ;				0x8028 = EVENT_OBJECT_IME_HIDE
-    ;				0x8027 = EVENT_OBJECT_IME_SHOW
-    ;				0x8029 = EVENT_OBJECT_IME_CHANGE
-    ;				0x8013 = EVENT_OBJECT_INVOKED
-    ;				0x8019 = EVENT_OBJECT_LIVEREGIONCHANGED
-    ;				0x800B = EVENT_OBJECT_LOCATIONCHANGE
-    ;				0x800C = EVENT_OBJECT_NAMECHANGE
-    ;				0x800F = EVENT_OBJECT_PARENTCHANGE
-    ;				0x8004 = EVENT_OBJECT_REORDER
-    ;				0x8006 = EVENT_OBJECT_SELECTION
-    ;				0x8007 = EVENT_OBJECT_SELECTIONADD
-    ;				0x8008 = EVENT_OBJECT_SELECTIONREMOVE
-    ;				0x8009 = EVENT_OBJECT_SELECTIONWITHIN
-    ;				0x8002 = EVENT_OBJECT_SHOW
-    ;				0x800A = EVENT_OBJECT_STATECHANGE
-    ;				0x8030 = EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED
-    ;				0x8014 = EVENT_OBJECT_TEXTSELECTIONCHANGED
-    ;				0x8018 = EVENT_OBJECT_UNCLOAKED
-    ;				0x800E = EVENT_OBJECT_VALUECHANGE
-    ;				0x0002 = EVENT_SYSTEM_ALERT
-    ;				0x8016 = EVENT_SYSTEM_ARRANGMENTPREVIEW
-    ;				0x0009 = EVENT_SYSTEM_CAPTUREEND
-    ;				0x0008 = EVENT_SYSTEM_CAPTURESTART
-    ;				0x000D = EVENT_SYSTEM_CONTEXTHELPEND
-    ;				0x000C = EVENT_SYSTEM_CONTEXTHELPSTART
-    ;				0x0020 = EVENT_SYSTEM_DESKTOPSWITCH
-    ;				0x0011 = EVENT_SYSTEM_DIALOGEND
-    ;				0x0010 = EVENT_SYSTEM_DIALOGSTART
-    ;				0x000F = EVENT_SYSTEM_DRAGDROPEND
-    ;				0x000E = EVENT_SYSTEM_DRAGDROPSTART
-    ;				0x00FF = EVENT_SYSTEM_END
-    ;				0x0003 = EVENT_SYSTEM_FOREGROUND
-    ;				0x0007 = EVENT_SYSTEM_MENUPOPUPEND
-    ;				0x0006 = EVENT_SYSTEM_MENUPOPUPSTART
-    ;				0x0005 = EVENT_SYSTEM_MENUEND
-    ;				0x0004 = EVENT_SYSTEM_MENUSTART
-    ;				0x0017 = EVENT_SYSTEM_MINIMIZEEND
-    ;				0x0016 = EVENT_SYSTEM_MINIMIZESTART
-    ;				0x000B = EVENT_SYSTEM_MOVESIZEEND
-    ;				0x000A = EVENT_SYSTEM_MOVESIZESTART
-    ;				0x0013 = EVENT_SYSTEM_SCROLLINGEND
-    ;				0x0012 = EVENT_SYSTEM_SCROLLINGSTART
-    ;				0x0001 = EVENT_SYSTEM_SOUND
-    ;				0x0015 = EVENT_SYSTEM_SWITCHEND
-    ;				0x0014 = EVENT_SYSTEM_SWITCHSTART
+; TODO: rewrite this.. it's not well programmed.
+; Converted to ahk v2 by
+;   github.com/tekert
+;
+; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=59149
+; Below is the original comment:
+;
+; [Class] WinHook
+; Fanatic Guru
+; 2019 02 18 v2
+;
+; Class to set hooks of windows or processes
+;
+;{============================
+;
+;	Class (Nested):		WinHook.Shell
+;
+;		Method:
+; 			Add(Func, wTitle:="", wClass:="", wExe:="", Event:=0)
+;
+;		Desc: Add Shell Hook
+;
+;   	Parameters:
+;		1) {Func}		Function name or Function object to call on event
+;   	2) {wTitle}	window Title to watch for event (default = "", all windows)
+;   	3) {wClass}	window Class to watch for event (default = "", all windows)
+;   	4) {wExe}		window Exe to watch for event (default = "", all windows)
+;   	5) {Event}		Event (default = 0, all events)
+;
+;		Returns: {Index}	index to hook that can be used to Remove hook
+;
+;				Shell Hook Events:
+;				1 = HSHELL_WINDOWCREATED
+;				2 = HSHELL_WINDOWDESTROYED
+;				3 = HSHELL_ACTIVATESHELLWINDOW
+;				4 = HSHELL_WINDOWACTIVATED
+;				5 = HSHELL_GETMINRECT
+;				6 = HSHELL_REDRAW
+;				7 = HSHELL_TASKMAN
+;				8 = HSHELL_LANGUAGE
+;				9 = HSHELL_SYSMENU
+;				10 = HSHELL_ENDTASK
+;				11 = HSHELL_ACCESSIBILITYSTATE
+;				12 = HSHELL_APPCOMMAND
+;				13 = HSHELL_WINDOWREPLACED
+;				14 = HSHELL_WINDOWREPLACING
+;				32768 = 0x8000 = HSHELL_HIGHBIT
+;				32772 = 0x8000 + 4 = 0x8004 = HSHELL_RUDEAPPACTIVATED (HSHELL_HIGHBIT + HSHELL_WINDOWACTIVATED)
+;				32774 = 0x8000 + 6 = 0x8006 = HSHELL_FLASH (HSHELL_HIGHBIT + HSHELL_REDRAW)
+;
+;		Note: ObjBindMethod(obj, Method) can be used to create a function object to a class method
+;					WinHook.Shell.Add(ObjBindMethod(TestClass.TestNestedClass, "MethodName"), wTitle, wClass, wExe, Event)
+;
+; ----------
+;
+;		Desc: Function Called on Event
+;			FuncOrMethod(Win_Hwnd, Win_Title, Win_Class, Win_Exe, Win_Event)
+;
+;		Parameters:
+;		1) {Win_Hwnd}		window handle ID of window with event
+;   	2) {Win_Title}		window Title of window with event
+;   	3) {Win_Class}		window Class of window with event
+;   	4) {Win_Exe}			window Exe of window with event
+;   	5) {Win_Event}		window Event
+;
+;		Note: FuncOrMethod will be called with DetectHiddenWindows On.
+;
+; --------------------
+;
+;		Method: 	Report(ByRef Object)
+;
+;		Desc: 		Report Shell Hooks
+;
+;		Returns:	string report
+;						ByRef	Object[Index].{Func, Title:, Class, Exe, Event}
+;
+; --------------------
+;
+;		Method:		Remove(Index)
+;		Method:		Deregister()
+;
+;{============================
+;
+;	Class (Nested):		WinHook.Event
+;
+;		Method:
+;			Add(eventMin, eventMax, eventProc, idProcess, WinTitle := "")
+;
+;		Desc: Add Event Hook
+;
+;   	Parameters:
+;		1) {eventMin}		lowest Event value handled by the hook function
+;   	2) {eventMax}		highest event value handled by the hook function
+;   	3) {eventProc}		event hook function, call be function name or function object
+;   	4) {idProcess}		ID of the process from which the hook function receives events (default = 0, all processes)
+;   	5) {WinTitle}			WinTitle to identify which windows to operate on, (default = "", all windows)
+;
+;		Returns: {hWinEventHook}	handle to hook that can be used to unhook
+;
+;				Event Hook Events:
+;				0x8012 = EVENT_OBJECT_ACCELERATORCHANGE
+;				0x8017 = EVENT_OBJECT_CLOAKED
+;				0x8015 = EVENT_OBJECT_CONTENTSCROLLED
+;				0x8000 = EVENT_OBJECT_CREATE
+;				0x8011 = EVENT_OBJECT_DEFACTIONCHANGE
+;				0x800D = EVENT_OBJECT_DESCRIPTIONCHANGE
+;				0x8001 = EVENT_OBJECT_DESTROY
+;				0x8021 = EVENT_OBJECT_DRAGSTART
+;				0x8022 = EVENT_OBJECT_DRAGCANCEL
+;				0x8023 = EVENT_OBJECT_DRAGCOMPLETE
+;				0x8024 = EVENT_OBJECT_DRAGENTER
+;				0x8025 = EVENT_OBJECT_DRAGLEAVE
+;				0x8026 = EVENT_OBJECT_DRAGDROPPED
+;				0x80FF = EVENT_OBJECT_END
+;				0x8005 = EVENT_OBJECT_FOCUS
+;				0x8010  = EVENT_OBJECT_HELPCHANGE
+;				0x8003 = EVENT_OBJECT_HIDE
+;				0x8020 = EVENT_OBJECT_HOSTEDOBJECTSINVALIDATED
+;				0x8028 = EVENT_OBJECT_IME_HIDE
+;				0x8027 = EVENT_OBJECT_IME_SHOW
+;				0x8029 = EVENT_OBJECT_IME_CHANGE
+;				0x8013 = EVENT_OBJECT_INVOKED
+;				0x8019 = EVENT_OBJECT_LIVEREGIONCHANGED
+;				0x800B = EVENT_OBJECT_LOCATIONCHANGE
+;				0x800C = EVENT_OBJECT_NAMECHANGE
+;				0x800F = EVENT_OBJECT_PARENTCHANGE
+;				0x8004 = EVENT_OBJECT_REORDER
+;				0x8006 = EVENT_OBJECT_SELECTION
+;				0x8007 = EVENT_OBJECT_SELECTIONADD
+;				0x8008 = EVENT_OBJECT_SELECTIONREMOVE
+;				0x8009 = EVENT_OBJECT_SELECTIONWITHIN
+;				0x8002 = EVENT_OBJECT_SHOW
+;				0x800A = EVENT_OBJECT_STATECHANGE
+;				0x8030 = EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED
+;				0x8014 = EVENT_OBJECT_TEXTSELECTIONCHANGED
+;				0x8018 = EVENT_OBJECT_UNCLOAKED
+;				0x800E = EVENT_OBJECT_VALUECHANGE
+;				0x0002 = EVENT_SYSTEM_ALERT
+;				0x8016 = EVENT_SYSTEM_ARRANGMENTPREVIEW
+;				0x0009 = EVENT_SYSTEM_CAPTUREEND
+;				0x0008 = EVENT_SYSTEM_CAPTURESTART
+;				0x000D = EVENT_SYSTEM_CONTEXTHELPEND
+;				0x000C = EVENT_SYSTEM_CONTEXTHELPSTART
+;				0x0020 = EVENT_SYSTEM_DESKTOPSWITCH
+;				0x0011 = EVENT_SYSTEM_DIALOGEND
+;				0x0010 = EVENT_SYSTEM_DIALOGSTART
+;				0x000F = EVENT_SYSTEM_DRAGDROPEND
+;				0x000E = EVENT_SYSTEM_DRAGDROPSTART
+;				0x00FF = EVENT_SYSTEM_END
+;				0x0003 = EVENT_SYSTEM_FOREGROUND
+;				0x0007 = EVENT_SYSTEM_MENUPOPUPEND
+;				0x0006 = EVENT_SYSTEM_MENUPOPUPSTART
+;				0x0005 = EVENT_SYSTEM_MENUEND
+;				0x0004 = EVENT_SYSTEM_MENUSTART
+;				0x0017 = EVENT_SYSTEM_MINIMIZEEND
+;				0x0016 = EVENT_SYSTEM_MINIMIZESTART
+;				0x000B = EVENT_SYSTEM_MOVESIZEEND
+;				0x000A = EVENT_SYSTEM_MOVESIZESTART
+;				0x0013 = EVENT_SYSTEM_SCROLLINGEND
+;				0x0012 = EVENT_SYSTEM_SCROLLINGSTART
+;				0x0001 = EVENT_SYSTEM_SOUND
+;				0x0015 = EVENT_SYSTEM_SWITCHEND
+;				0x0014 = EVENT_SYSTEM_SWITCHSTART
 
-    ;
-    ;		Note: ObjBindMethod(obj, Method) can be used to create a function object to a class method
-    ;					WinHook.Event.Add((eventMin, eventMax, ObjBindMethod(TestClass.TestNestedClass, "MethodName"), idProcess, WinTitle := "")
-    ;
-    ; ----------
-    ;
-    ;		Desc: Function Called on Event
-    ;			FuncOrMethod(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
-    ;
-    ;		Parameters:
-    ;		1) {hWinEventHook}		Handle to an event hook instance.
-    ;   	2) {event}						Event that occurred. This value is one of the event constants
-    ;   	3) {hwnd}						Handle to the window that generates the event.
-    ;   	4) {idObject}					Identifies the object that is associated with the event.
-    ;   	5) {idChild}					Child ID if the event was triggered by a child element.
-    ;   	6) {dwEventThread}		Identifies the thread that generated the event.
-    ;   	7) {dwmsEventTime}	Specifies the time, in milliseconds, that the event was generated.
-    ;
-    ;		Note: FuncOrMethod will be called with DetectHiddenWindows On.
-    ;
-    ; --------------------
-    ;
-    ;		Method:	Report(ByRef Object)
-    ;
-    ;		Returns:	string report
-    ;						ByRef	Object[hWinEventHook].{eventMin, eventMax, eventProc, idProcess, WinTitle}
-    ;
-    ; --------------------
-    ;
-    ;		Method: 	UnHook(hWinEventHook)
-    ;		Method: 	UnHookAll()
-    ;
-    ;{============================
-    class WinHook
+;
+;		Note: ObjBindMethod(obj, Method) can be used to create a function object to a class method
+;					WinHook.Event.Add((eventMin, eventMax, ObjBindMethod(TestClass.TestNestedClass, "MethodName"), idProcess, WinTitle := "")
+;
+; ----------
+;
+;		Desc: Function Called on Event
+;			FuncOrMethod(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
+;
+;		Parameters:
+;		1) {hWinEventHook}		Handle to an event hook instance.
+;   	2) {event}						Event that occurred. This value is one of the event constants
+;   	3) {hwnd}						Handle to the window that generates the event.
+;   	4) {idObject}					Identifies the object that is associated with the event.
+;   	5) {idChild}					Child ID if the event was triggered by a child element.
+;   	6) {dwEventThread}		Identifies the thread that generated the event.
+;   	7) {dwmsEventTime}	Specifies the time, in milliseconds, that the event was generated.
+;
+;		Note: FuncOrMethod will be called with DetectHiddenWindows On.
+;
+; --------------------
+;
+;		Method:	Report(ByRef Object)
+;
+;		Returns:	string report
+;						ByRef	Object[hWinEventHook].{eventMin, eventMax, eventProc, idProcess, WinTitle}
+;
+; --------------------
+;
+;		Method: 	UnHook(hWinEventHook)
+;		Method: 	UnHookAll()
+;
+;{============================
+class WinHook
+{
+    class Shell
     {
-        class Shell
+        static Hooks := Map()
+        static Events := Map()
+
+        static Add(Func, wTitle := "", wClass := "", wExe := "", Event := 0)
         {
-            static Hooks := Map()
-            static Events := Map()
+            if !WinHook.Shell.Hooks
+            {
+                WinHook.Shell.Hooks := Map(), WinHook.Shell.Events := Map()
+                DllCall("RegisterShellHookWindow", "UInt", A_ScriptHwnd)
+                MsgNum := DllCall("RegisterWindowMessage", "Str", "SHELLHOOK")
+                OnMessage(MsgNum, %ObjBindMethod(WinHook.Shell, "Message")%)
+            }
+            if !IsObject(Func)
+                Func := %Func%
+            WinHook.Shell.Hooks.Push({ Func: Func, Title: wTitle, Class: wClass, Exe: wExe, Event: Event })
+            WinHook.Shell.Events[Event] := true
+            return WinHook.Shell.Hooks.Length
+        }
+        static Remove(Index)
+        {
+            WinHook.Shell.Hooks.Delete(Index)
+            WinHook.Shell.Events[Index] := {}	; delete and rebuild Event list
+            For key, Hook in WinHook.Shell.Hooks
+                WinHook.Shell.Events[Hook.Event] := true
+        }
+        static Report(&Obj := "")
+        {
+            Obj := WinHook.Shell.Hooks
+            For key, Hook in WinHook.Shell.Hooks
+                Display .= key "|" Hook.Event "|" Hook.Func.Name "|" Hook.Title "|" Hook.Class "|" Hook.Exe "`n"
+            return Trim(Display, "`n")
+        }
+        static Deregister()
+        {
+            DllCall("DeregisterShellHookWindow", "UInt", A_ScriptHwnd)
+            WinHook.Shell.Hooks := "", WinHook.Shell.Events := ""
+        }
+        static Message(Event, Hwnd) ; Private Method
+        {
+            DetectHiddenWindows(true)
+            If (WinHook.Shell.Events[Event] or WinHook.Shell.Events[0])
+            {
 
-            static Add(Func, wTitle := "", wClass := "", wExe := "", Event := 0)
-            {
-                if !WinHook.Shell.Hooks
-                {
-                    WinHook.Shell.Hooks := Map(), WinHook.Shell.Events := Map()
-                    DllCall("RegisterShellHookWindow", "UInt", A_ScriptHwnd)
-                    MsgNum := DllCall("RegisterWindowMessage", "Str", "SHELLHOOK")
-                    OnMessage(MsgNum, %ObjBindMethod(WinHook.Shell, "Message")%)
-                }
-                if !IsObject(Func)
-                    Func := %Func%
-                WinHook.Shell.Hooks.Push({ Func: Func, Title: wTitle, Class: wClass, Exe: wExe, Event: Event })
-                WinHook.Shell.Events[Event] := true
-                return WinHook.Shell.Hooks.Length
-            }
-            static Remove(Index)
-            {
-                WinHook.Shell.Hooks.Delete(Index)
-                WinHook.Shell.Events[Index] := {}	; delete and rebuild Event list
-                For key, Hook in WinHook.Shell.Hooks
-                    WinHook.Shell.Events[Hook.Event] := true
-            }
-            static Report(&Obj := "")
-            {
-                Obj := WinHook.Shell.Hooks
-                For key, Hook in WinHook.Shell.Hooks
-                    Display .= key "|" Hook.Event "|" Hook.Func.Name "|" Hook.Title "|" Hook.Class "|" Hook.Exe "`n"
-                return Trim(Display, "`n")
-            }
-            static Deregister()
-            {
-                DllCall("DeregisterShellHookWindow", "UInt", A_ScriptHwnd)
-                WinHook.Shell.Hooks := "", WinHook.Shell.Events := ""
-            }
-            static Message(Event, Hwnd) ; Private Method
-            {
-                DetectHiddenWindows(true)
-                If (WinHook.Shell.Events[Event] or WinHook.Shell.Events[0])
-                {
-
-                    wTitle := WinGetTitle("ahk_id " Hwnd)
-                    wClass := WinGetClass("ahk_id " Hwnd)
-                    wExe := WinGetProcessName("ahk_id " Hwnd)
-                    for key, Hook in WinHook.Shell.Hooks
-                        if ((Hook.Title = wTitle or Hook.Title = "") and (Hook.Class = wClass or Hook.Class = "") and (Hook.Exe = wExe or Hook.Exe = "") and (Hook.Event = Event or Hook.Event = 0))
-                            return Hook.Func.Call(Hwnd, wTitle, wClass, wExe, Event)
-                }
+                wTitle := WinGetTitle("ahk_id " Hwnd)
+                wClass := WinGetClass("ahk_id " Hwnd)
+                wExe := WinGetProcessName("ahk_id " Hwnd)
+                for key, Hook in WinHook.Shell.Hooks
+                    if ((Hook.Title = wTitle or Hook.Title = "") and (Hook.Class = wClass or Hook.Class = "") and (Hook.Exe = wExe or Hook.Exe = "") and (Hook.Event = Event or Hook.Event = 0))
+                        return Hook.Func.Call(Hwnd, wTitle, wClass, wExe, Event)
             }
         }
-        class Event
-        {
-            static Hooks := Map()
+    }
+    class Event
+    {
+        static Hooks := Map()
 
-            static Add(eventMin, eventMax, eventProc, idProcess := 0, WinTitle := "")
+        static Add(eventMin, eventMax, eventProc, idProcess := 0, WinTitle := "")
+        {
+            static CB_WinEventProc := CallbackCreate(WinHook.Event.Message)
+            if !WinHook.Event.Hooks
             {
-                static CB_WinEventProc := CallbackCreate(WinHook.Event.Message)
-                if !WinHook.Event.Hooks
-                {
-                    WinHook.Event.Hooks := Map()
-                    OnExit(ObjBindMethod(WinHook.Event, "UnHookAll"))
-                }
-                hWinEventHook := DllCall("SetWinEventHook"
+                WinHook.Event.Hooks := Map()
+                OnExit(ObjBindMethod(WinHook.Event, "UnHookAll"))
+            }
+            hWinEventHook := DllCall("SetWinEventHook"
                 , "UInt", eventMin						;  UINT eventMin
                 , "UInt", eventMax						;  UINT eventMax
                 , "Ptr", 0x0							;  HMODULE hmodWinEventProc
@@ -951,44 +975,44 @@ class VRising
                 , "UInt", idProcess						;  DWORD idProcess
                 , "UInt", 0x0							;  DWORD idThread
                 , "UInt", 0x0 | 0x2) 					;  UINT dwflags, OutOfContext|SkipOwnProcess
-                if !IsObject(eventProc)
-                    eventProc := %eventProc%
-                WinHook.Event.Hooks[hWinEventHook] := { eventMin: eventMin, eventMax: eventMax, eventProc: eventProc, idProcess: idProcess, WinTitle: WinTitle }
-                return hWinEventHook
-            }
-            static Report(&Obj := "")
-            {
-                Obj := WinHook.Event.Hooks
-                For hWinEventHook, Hook in WinHook.Event.Hooks
-                    Display .= hWinEventHook "|" Hook.eventMin "|" Hook.eventMax "|" Hook.eventProc.Name "|" Hook.idProcess "|" Hook.WinTitle "`n"
-                return Trim(Display, "`n")
-            }
-            static UnHook(hWinEventHook)
-            {
+            if !IsObject(eventProc)
+                eventProc := %eventProc%
+            WinHook.Event.Hooks[hWinEventHook] := { eventMin: eventMin, eventMax: eventMax, eventProc: eventProc, idProcess: idProcess, WinTitle: WinTitle }
+            return hWinEventHook
+        }
+        static Report(&Obj := "")
+        {
+            Obj := WinHook.Event.Hooks
+            For hWinEventHook, Hook in WinHook.Event.Hooks
+                Display .= hWinEventHook "|" Hook.eventMin "|" Hook.eventMax "|" Hook.eventProc.Name "|" Hook.idProcess "|" Hook.WinTitle "`n"
+            return Trim(Display, "`n")
+        }
+        static UnHook(hWinEventHook)
+        {
+            DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
+            WinHook.Event.Hooks.Delete(hWinEventHook)
+        }
+        static UnHookAll()
+        {
+            for hWinEventHook, Hook in WinHook.Event.Hooks
                 DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
-                WinHook.Event.Hooks.Delete(hWinEventHook)
-            }
-            static UnHookAll()
-            {
-                for hWinEventHook, Hook in WinHook.Event.Hooks
-                    DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
-                WinHook.Event.Hooks := "", CB_WinEventProc := ""
-            }
-            static Message(event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime) ; 'Private Method
-            {
-                DetectHiddenWindows(true)
-                Hook := WinHook.Event.Hooks[hWinEventHook := this] ; this' is hidden param1 because method is called as func
+            WinHook.Event.Hooks := "", CB_WinEventProc := ""
+        }
+        static Message(event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime) ; 'Private Method
+        {
+            DetectHiddenWindows(true)
+            Hook := WinHook.Event.Hooks[hWinEventHook := this] ; this' is hidden param1 because method is called as func
 
-                aList := WinGetList(Hook.WinTitle, , ,)
-                Loop aList.Length
-                    if (aList[A_Index] = hwnd)
-                        return Hook.eventProc.Call(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
-            }
+            aList := WinGetList(Hook.WinTitle, , ,)
+            Loop aList.Length
+                if (aList[A_Index] = hwnd)
+                    return Hook.eventProc.Call(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
         }
     }
+}
 
-    ; .. TESTS ..
-    ; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... meh autohotkey doesn't do this right
+; .. TESTS ..
+; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... meh autohotkey doesn't do this right
 /*
 F4::
 {
@@ -1028,7 +1052,7 @@ F3::
   }
 
 }
-    */
+*/
 
 F2::
 {

@@ -685,9 +685,6 @@ class _ClassMemory
 
     pointer(address, finalType := "UInt", offsets*)
     {
-        aver := this.read(address, this.ptrType)
-        a := this.ErrorLevel
-
         For index, offset in offsets
             address := this.read(address, this.ptrType) + offset
         Return this.read(address, finalType)
