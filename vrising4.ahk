@@ -173,6 +173,17 @@ $LAlt Up::
     vrObj.EnableScanTimer()
 }
 
+; Keyboard for console
+; This is the key above "TAB" left of "1"
+SC029:: ; <- put here your favorite key to open the console, we use de default SC029
+{
+    Send '{U+0060}' ;"`" <- back accent: https://kbdlayout.info/how/%60
+}
+
+; ------------
+; HOTKEYS END
+; ------------
+
 class VRising
 {
     processName := "VRising.exe"
