@@ -42,7 +42,6 @@ useMemScan := True
 
 
 scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if usesMemScan = False)
-
 ; Use 0.45 to 0.0 (Y axys % on where the mouse will center, 0 is top of the screen)
 ; Dont use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities. TODO: check if i can expand the camera pitch via memory
 ;   For throwing area abilities closer to you there are two ingame methods, one is tilting the camera to the ground, it helps but not enough
@@ -50,6 +49,10 @@ scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if us
 ;   The last is, pressing <script_key=shift> before throwing the ability so you can move the cursor, if the ability is on Q and the script key is shift, this is not ideal.
 ; TODO: make it so we can move the mouse on the Y axis from 0.45 to 0.25 (uhm, is possible but don't know if it's ideal, check other options)
 lockMouseOnYaxis := 0.27
+
+pitchValue := 0.4
+; Most npcs disapear at ~50 meters or so
+; so Ranges from 0.0 to 0.3 are a bit dissy for pvp
 
 ; Array of pointer offsets taken from pointers maps when the menu state is stored:
 ; Tested Working from [1.0.0] to [v1.0.6]
@@ -164,7 +167,7 @@ F2::
     if (canSpam)
     {
         canSpam := 0
-        vrObj.setPitch(0.1)
+        vrObj.setPitch(valuePitch)
     }
     canSpam := 1
 }
@@ -488,9 +491,15 @@ class VRising
     ;
     ; Return values:
     ;   True -  Success. The memory pitchAddress of the pitch pitchAddress was written, camera pitch should change
-    ;   False - Error.  Something happended and pitch was not changed, maybe the AOB pattern is not found.
+    ;   False - Error.  Something happended and pitch was not changed.
     setPitch(pitch)
     {
+        if (!IsFloat(pitch))
+        {
+             MsgBox "valuePitch has to be a float value!"
+             return False
+        }
+
         ret := 0
         fromAddress := 0
         ; Change all ocurrence, this object is created at least 2 times in memory, the first one fades at garbage collection.
@@ -1236,7 +1245,7 @@ F4::
 }
 */
 
-F3::
+F4::
 {
     if (!vrObj.isMemValid())
     {
