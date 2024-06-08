@@ -53,6 +53,7 @@ lockMouseOnYaxis := 0.27
 pitchValue := 0.4
 ; Most npcs disapear at ~50 meters or so
 ; so Ranges from 0.0 to 0.3 are a bit dissy for pvp
+; Default is 0.6632251143
 
 ; Array of pointer offsets taken from pointers maps when the menu state is stored:
 ; Tested Working from [1.0.0] to [v1.0.6]
@@ -129,7 +130,7 @@ CoordMode("Mouse", "Window") ; To support the game if its in window mode
 
 WinWait("VRising")
 
-; Make all newly launched threads below (hotkeys) higher priority?, (not interruptable by timers above)
+; Make all newly launched threads below (hotkeys) higher priority?, (not interruptable by timers)
 ; https://www.autohotkey.com/docs/v2/lib/Thread.htm#NoTimers
 Thread "NoTimers", True
 
@@ -147,7 +148,7 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
 ; All these hotkeys only work when the game window is active so no need to check on every key press.
 ;
 
-; F1 or End key: Enables or disables the script Suspending timers and hotkeys except F1 End
+; F1 or End key: Enables or disables the script, disabling timers and hotkeys except for F1 and End keys
 ; https://www.autohotkey.com/docs/v2/lib/Suspend.htm
 #SuspendExempt
 End::
@@ -167,7 +168,7 @@ F2::
     if (canSpam)
     {
         canSpam := 0
-        vrObj.setPitch(valuePitch)
+        vrObj.setPitch(pitchValue)
     }
     canSpam := 1
 }
@@ -280,14 +281,13 @@ class VRising
     _useMemScan := True
     _lockAxysLevel := 0.27
     _scanMenusFunc := ""    ; !Important, for SetTimer Off we have to use the same ObjBindMethod that was used to create the timer,
-    ;   since its not static, it creates a new object on each call.
-    _savedXpos := ""
-    _savedYpos := ""
+                            ;   since its not static, it creates a new object on each call.
+    _savedXpos := ""        ; Save mouse X position before locking it with right click
+    _savedYpos := ""        ; Save mouse Y position before locking it with right click
 
     ; Parameters:
     ;   useMemScan  -   If false, uses PixelGet, this will have to be manually verified depending on resolution but works on all versions (if the pixels don't change)
-    ;                       moduleNameMenu, moduleNameMenuOffset, moduleMenuOffsets are ignored if this parameters is False
-    ;                   If True, uses the module* parameters to scan for menu activity, works on all resolutions but maybe not all version
+    ;                   If True, uses the values supplied in setMenuAddresses method to scan for menu activity, works on all resolutions but maybe not all versions
     __new(processName := "VRising.exe", useMemScan := True)
     {
         this._useMemScan := useMemScan
