@@ -628,15 +628,6 @@ class VRising
         if ((this._menuAddress != "") and (this._menuAddress > 0))
             return this._menuAddress
 
-        /*
-            Self note: AOB patterns may be searched like this:
-
-            pattern := vrisingMem.hexStringToPattern("00 00 00 00 00 00 00 00 ?? ?? ?? ?? 00 00 00 00 00 00 00 00 00 00 ?? ?? 00 00 ?? ?? 00 00 00 00 01 00 00 00 00 00 00 00 ?? ?? ?? ?? ?? 01 00 00 F8 01 00 00 02 00 00 00")
-            vrisingMem.stringToPattern("UnityGfxDeviceWorker")
-            pitchAddress := vrisingMem.processPatternScan(,, pattern*) ; Note the '*'
-            ; Memory Address are returned as an int decimal
-        */
-
         ; Positive integer - The module's base/load pitchAddress (success).
         ;   -1 - Module not found
         ;   -3 - EnumProcessModulesEx failed
