@@ -454,11 +454,12 @@ class _ClassMemory
             return ""
         }
         result := 0
-        if DllCall("ReadProcessMemory", "Ptr", this.hProcess
-              , "Ptr", aOffsets.Length ? this.getAddressFromOffsets(address, aOffsets*) : address
-              , type "*", &result
-              , "Ptr", _ClassMemory.aTypeSize[type]
-              , "Ptr", this.pNumberOfBytesRead)
+        if DllCall("ReadProcessMemory"
+                , "Ptr", this.hProcess
+                , "Ptr", aOffsets.Length ? this.getAddressFromOffsets(address, aOffsets*) : address
+                , type "*", &result
+                , "Ptr", _ClassMemory.aTypeSize[type]
+                , "Ptr", this.pNumberOfBytesRead)
             return result
 
         return
@@ -610,7 +611,12 @@ class _ClassMemory
             this.ErrorLevel := -2
             return ""
         }
-        return DllCall("WriteProcessMemory", "Ptr", this.hProcess, "Ptr", aOffsets.Length ? this.getAddressFromOffsets(address, aOffsets*) : address, type "*", &value, "Ptr", _ClassMemory.aTypeSize[type], "Ptr", this.pNumberOfBytesWritten)
+        return DllCall("WriteProcessMemory"
+            , "Ptr", this.hProcess
+            , "Ptr", aOffsets.Length ? this.getAddressFromOffsets(address, aOffsets*) : address
+            , type "*", &value, "Ptr"
+            , _ClassMemory.aTypeSize[type]
+            , "Ptr", this.pNumberOfBytesWritten)
     }
 
     ; Method:   writeRaw(address, pBuffer, sizeBytes, aOffsets*)

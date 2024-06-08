@@ -4,6 +4,10 @@
 
 ; CHANGELOG
 
+; ver 0.9.5
+; Found how to change the pitch from memory (press F2 and wait 20s), sadly using AOBs,
+;   maybe in the future I will find where cameraState object is populated.
+
 ; ver 0.9
 ; Almost a complete rewrite using classes, many refactors for scans.
 ; Added memory scan and pixelget options
@@ -47,17 +51,53 @@ scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if us
 ; TODO: make it so we can move the mouse on the Y axis from 0.45 to 0.25 (uhm, is possible but don't know if it's ideal, check other options)
 lockMouseOnYaxis := 0.27
 
-; Array of pointer offsets taken from pointers maps:
+; Array of pointer offsets taken from pointers maps when the menu state is stored:
 ; Tested Working from [1.0.0] to [v1.0.6]
-moduleName := "UnityPlayer.dll"
-moduleNameOffset := 0x01CEE8E8
-moduleOffsets := [0xB8, 0x00, 0xB0, 0xF0, 0x40, 0x20, 0x18]
+menuModuleName := "UnityPlayer.dll"
+menuModuleOffset := 0x01CEE8E8
+menuModulePointerOffsets := [0xB8, 0x00, 0xB0, 0xF0, 0x40, 0x20, 0x18]
 ; NOTE:
-; To find the address manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05 (mark Hex and put 05),
+; To find the pitchAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05 (mark Hex and put 05),
 ;   then go to options menu, search for 0x04, finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
-; There is your address, now repeat this a bunch of times after reopening the game taking pointer scans after you find the address each time,
+; There is your pitchAddress, now repeat this a bunch of times after reopening the game taking pointer scans after you find the pitchAddress each time,
 ; after 2 or 3 times, compare the pointer scans against the current most recent scan and pick some pointers from UnityPlayer.dll.
 
+; Pitch cameraState structure
+; This value gets created dynamically each time a world is loaded, the final value of the pitch is always a float = 0,6632251143 or AOB = 1F C9 29 3F little endian
+; AOB of structure: 1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00
+; "??" may be used for wildcards, like "01 02 ?? 04 05"
+; Tested Working in  [v1.0.6]
+pitchAOB := "1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00"
+pitchOffset := 0x0
+
+/*
+    DEV NOTES
+    cameraState structure
+    dynamically allocated
+    some values like pitch derived from other values.
+    This gets created somewhere by the unity engine on game world load
+    TODO: check what the other values do.
+
+    52 B8 9E 3F 6F 12 03 3B
+    6F 12 03 3C 6F 12 03 3B
+    6F 12 03 3C 00 00 C8 42
+    00 00 E1 43 00 00 48 42
+    00 00 16 43 00 00 00 00
+    ?? ?? ?? ?? ?? ?? ?? ??   Pointer
+    9A 99 19 3F 00 00 00 00
+    ?? ?? ?? ?? ?? ?? ?? ??   Pointer
+    9A 99 99 3E 00 00 F0 40
+    ?? ?? ?? ?? ?? ?? ?? ??   Pointer
+    00 00 00 41 66 66 66 3F
+    00 00 40 41 00 00 40 41
+    00 00 40 40 00 00 60 41
+    C0 92 81 3F
+    1F C9 29 3F               <- Here is our pitch float
+    00 00 60 41 00 00 A0 40
+    00 00 78 41 36 8D A7 3F
+    DB 0F 49 3F 01 00 00 00
+    00 00 78 41 00 00 00 00
+*/
 ; ---------------------------------
 ; Please don't edit below this line (except maybe the hotkeys section)
 ; ---------------------------------
@@ -91,7 +131,10 @@ WinWait("VRising")
 Thread "NoTimers", True
 
 ; Process name (in case for some reason it changes)
-vrObj := VRising("VRising.exe", useMemScan, moduleName, moduleNameOffset, moduleOffsets)
+vrObj := VRising("VRising.exe", useMemScan)
+vrObj.setMenuAddresses(menuModuleName, menuModuleOffset, menuModulePointerOffsets)
+vrObj.setPitchAOB(pitchAOB, pitchOffset)
+
 vrObj.lockAxysLevel := lockMouseOnYaxis
 
 ;---------------
@@ -113,6 +156,18 @@ F1::
         vrObj.SuspendScript(True, True)
 }
 #SuspendExempt False
+
+; This may take 20s to have effect, dont spam it :)
+F2::
+{
+    static canSpam := 1
+    if (canSpam)
+    {
+        canSpam := 0
+        vrObj.setPitch(0.1)
+    }
+    canSpam := 1
+}
 
 ; Temporarily disables auto mouse lock when shift is pressed.
 $LShift::
@@ -190,7 +245,7 @@ class VRising
 
     ; Lock the mouse at this height on the Y axys on the middle of the game window
     ; Percent from 0.0 to 1.0 of the Y axys, 0.0 (0%) being the top and 1.0 (100%) the bottom.
-    ; Here we lock it just below 1/4 by default couting from the top of the game window
+    ; Here we lock it just below 1/4 by default counting from the top of the game window
     lockAxysLevel
     {
         get => this._lockAxysLevel
@@ -209,14 +264,16 @@ class VRising
 
     _hProcess := ""         ; HANDLE of the vrising.exe process               (not used if using pixel scans)
     _vrisingMem := ""       ; _ClassMemory Object                             (not used if using pixel scans)
-    _menuAddress := 0       ; Memory address to check for overlay menus       (not used if using pixel scans)
+    _menuAddress := 0       ; Memory pitchAddress to check for overlay menus       (not used if using pixel scans)
+    _pitchAOB := ""
+    _pitchAOBOffset := 0x0   ; Offset for the AOB pattern
     _winHooksArray := []
     _timerDisabled := True  ; Enable or disable auto lock with F1 key (also used internally to disable the script when shift or etc)
     _cameraLocked := False  ; True when the camera is currently locked by the script (used to play nicely with real right mouse clicks on menus)
     _isInFocus := ""
-    _moduleName := ""
-    _moduleNameOffset := 0  ; Module offsset where to start.
-    _moduleOffsets := []    ; Array of offsets in order from pointer scans.
+    _menuModuleName := ""                   ; Module name of there the menu state pointer is stored.
+    _menuModuleOffset := 0              ; Module offset where the menu state pointer is inside the module
+    _menuModulePointerOffsets := []     ; Array of offsets in order from pointer scans.
     _useMemScan := True
     _lockAxysLevel := 0.27
     _scanMenusFunc := ""    ; !Important, for SetTimer Off we have to use the same ObjBindMethod that was used to create the timer,
@@ -226,9 +283,9 @@ class VRising
 
     ; Parameters:
     ;   useMemScan  -   If false, uses PixelGet, this will have to be manually verified depending on resolution but works on all versions (if the pixels don't change)
-    ;                       moduleName, moduleNameOffset, moduleOffsets are ignored if this parameters is False
+    ;                       moduleNameMenu, moduleNameMenuOffset, moduleMenuOffsets are ignored if this parameters is False
     ;                   If True, uses the module* parameters to scan for menu activity, works on all resolutions but maybe not all version
-    __new(processName := "VRising.exe", useMemScan := True, moduleName := "", moduleNameOffset := 0, moduleOffsets := [])
+    __new(processName := "VRising.exe", useMemScan := True)
     {
         this._useMemScan := useMemScan
 
@@ -238,13 +295,6 @@ class VRising
                 this.processName := processName
             else
                 throw TypeError("Need a String type for processName")
-
-            if (moduleName = "")
-                throw ValueError("Please provide a valid moduleName to search for")
-
-            this._moduleName := moduleName
-            this._moduleNameOffset := moduleNameOffset
-            this._moduleOffsets := moduleOffsets
         }
         else
         {
@@ -369,6 +419,8 @@ class VRising
         }
         errors := 0
         this._menuAddress := menuAddress
+
+        ; TODO: Sadly pitch memory pitchAddress is dynamically created and its value too, so we have to scan for it every time we want the pitch changed
     }
 
     ; Disable Timers and close Memory instance
@@ -390,8 +442,8 @@ class VRising
         if (this.isMemValid())
             return
 
-        ; Don't open with write access, not needed
-        dwDesiredAccess := _ClassMemory.aRights.PROCESS_QUERY_INFORMATION | _ClassMemory.aRights.PROCESS_VM_READ
+        ; We need write access for chaning camera pitch values inside the game.
+        dwDesiredAccess := _ClassMemory.aRights.PROCESS_QUERY_INFORMATION | _ClassMemory.aRights.PROCESS_VM_READ | _ClassMemory.aRights.PROCESS_VM_WRITE
         hProcessCopy := 0
         vrisingMem := _ClassMemory("ahk_exe " this.processName, dwDesiredAccess, &hProcessCopy)
 
@@ -412,19 +464,139 @@ class VRising
         this._hProcess := hProcessCopy
     }
 
+    setMenuAddresses(menuModuleName := "", menuModuleOffset := 0, menuModulePointerOffsets := [])
+    {
+        if (menuModuleName = "")
+            throw ValueError("Please provide a valid menuModuleName to search for")
+
+        this._menuModuleName := menuModuleName
+        this._menuModuleOffset := menuModuleOffset
+        this._menuModulePointerOffsets := menuModulePointerOffsets
+    }
+
+    setPitchAOB(pitchAOB, pitchAOBOffset := 0x0)
+    {
+        this._pitchAOB := pitchAOB
+        this._pitchAOBOffset := pitchAOBOffset
+    }
+
+    ; We have to scan every time this is called, the AOB pattern is dynamically allocated, it changes everytime a world is loaded, and the value is computen dynamically.
+    ; TODO: check where this value gets computed.
+    ;
+    ; Parameters:
+    ;   pitch             4 byte Float values from 0.0 (full pitch range) to 1.0 (camera pitch locked)
+    ;
+    ; Return values:
+    ;   True -  Success. The memory pitchAddress of the pitch pitchAddress was written, camera pitch should change
+    ;   False - Error.  Something happended and pitch was not changed, maybe the AOB pattern is not found.
+    setPitch(pitch)
+    {
+        ret := 0
+        fromAddress := 0
+        ; Change all ocurrence, this object is created at least 2 times in memory, the first one fades at garbage collection.
+        Loop
+        {
+            foundAddress := this._scanCameraPitchAddress(fromAddress)
+            if ((foundAddress = "") or (foundAddress < 0))
+            {
+                MsgBox "Could not get pitch pointer pitchAddress, setPitch error, pitchAddress returned: " pitchAddress
+                return False
+            }
+            if (foundAddress = 0)
+            {
+                return ret ? True : False
+            }
+            pitchAddress := foundAddress + this._pitchAOBOffset
+            fromAddress := pitchAddress + 4
+
+            try
+            {
+                ret := this._vrisingMem.write(pitchAddress, pitch, "Float")
+                ;       Non Zero -  Indicates success.
+                ;       Zero     -  Indicates failure. Check errorLevel and A_LastError for more information
+                ;       Null    -   An invalid type was passed. this.Errorlevel is set to -2 TODO: throws on v2
+                if ((ret = "") or (ret = 0))
+                    return False
+            }
+            catch Error as err
+            {
+                throw err
+                ;return False
+            }
+        }
+
+        return False
+    }
+
+    ; NOTE: We have to compute this every time a world is loaded,
+    ;   the only way for now is to create a hotkey to change the pitch wich first scans the AOB using this pitchAddress.
+    ;   startAddress -      The memory address from which to begin the search.
+    ;   endAddress -        The memory address at which the search ends.
+    ;                       Defaults to 0x7FFFFFFF for 32 bit target processes.
+    ;                       Defaults to 0xFFFFFFFF for 64 bit target processes when the AHK script is 32 bit.
+    ;                       Defaults to 0x7FFFFFFFFFF for 64 bit target processes when the AHK script is 64 bit.
+    ;                       0x7FFFFFFF and 0x7FFFFFFFFFF are the maximum process usable virtual address spaces for 32 and 64 bit applications.
+    ;                       Anything higher is used by the system (unless /LARGEADDRESSAWARE and 4GT have been modified).
+    ;                       Note: The entire pattern must be occur inside this range for a match to be found. The range is inclusive.
+    ; Return values:
+    ;   Positive integer -  Success. The memory pitchAddress of the found pattern.
+    ;   0                   The pattern was not found.
+    ;   -1                  VirtualQueryEx() failed.
+    ;   -2                  Failed to read a memory region.
+    ;   -10                 The aAOBPattern* is invalid. (No bytes were passed)
+    ;   -99                 Invalid handle or _ClassMemory Object, reopen handle and try again
+    _scanCameraPitchAddress(startAddress := 0, endAddress := "")
+    {
+        if (!this.isMemValid())
+            return -99
+
+        ;if ((this._cameraStateAddress != "") and (this._cameraStateAddress > 0))
+        ;    return this._cameraStateAddress
+
+        pitchAddress := ""
+        try
+        {
+            pattern := this._vrisingMem.hexStringToPattern(this._pitchAOB)
+            pitchAddress := this._vrisingMem.processPatternScan(,, pattern*) ; Note the '*'
+            ; Memory Address are returned as an int decimal
+            if (pitchAddress < 0)
+            {
+                switch pitchAddress
+                {
+                    case -1: MsgBox "VirtualQueryEx() failed."
+                    case -2: MsgBox "Failed to read a memory region"
+                    case -10: MsgBox "The aAOBPattern* is invalid. (No bytes were passed)"
+                }
+            }
+            else
+            {
+                 ; The last object is the valid one
+
+            }
+
+        }
+        catch Error as err
+        {
+            throw err
+            ;Sleep(1000)
+        }
+
+        return pitchAddress
+    }
+
     ; Method:   _getMenuAddress()
     ;            Get the base addres of the open/close state of game menues
     ;            Memory Address are returned as an int decimal
     ; Return values:
-    ;   Positive integer - The module's base/load address (success).
-    ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
+    ;   Positive integer - The module's base/load pitchAddress (success).
     ;   -1  - Module not found
     ;   -3  - EnumProcessModulesEx failed
     ;   -4  - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
+    ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
     ;
     /*  --------
         POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
-        There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address
+        There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base pitchAddress
 
         ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = value that hold a byte with depending on wich menu is open
 
@@ -452,20 +624,20 @@ class VRising
 
             pattern := vrisingMem.hexStringToPattern("00 00 00 00 00 00 00 00 ?? ?? ?? ?? 00 00 00 00 00 00 00 00 00 00 ?? ?? 00 00 ?? ?? 00 00 00 00 01 00 00 00 00 00 00 00 ?? ?? ?? ?? ?? 01 00 00 F8 01 00 00 02 00 00 00")
             vrisingMem.stringToPattern("UnityGfxDeviceWorker")
-            address := vrisingMem.processPatternScan(,, pattern*) ; Note the '*'
+            pitchAddress := vrisingMem.processPatternScan(,, pattern*) ; Note the '*'
             ; Memory Address are returned as an int decimal
         */
 
-        ; Positive integer - The module's base/load address (success).
+        ; Positive integer - The module's base/load pitchAddress (success).
         ;   -1 - Module not found
         ;   -3 - EnumProcessModulesEx failed
         ;   -4 - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
-        moduleBaseAddress := this._vrisingMem.getModuleBaseAddress(this._moduleName)
+        moduleBaseAddress := this._vrisingMem.getModuleBaseAddress(this._menuModuleName)
         if (moduleBaseAddress < 0)
         {
             switch moduleBaseAddress
             {
-                case -1: MsgBox "Module " this._moduleName " not found"
+                case -1: MsgBox "Module " this._menuModuleName " not found"
                 case -3: MsgBox "EnumProcessModulesEx failed"
                 case -4: MsgBox "The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed."
             }
@@ -474,12 +646,11 @@ class VRising
         ret := ""
         try
         {
-            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._moduleNameOffset, this._moduleOffsets*)
+            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset, this._menuModulePointerOffsets*)
             if (ret = "" or ret <= 0)
             {
                 ; TODO: url for issues.
                 MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, ret: " ret
-                return ret
             }
         }
         catch Error as err
@@ -1025,7 +1196,7 @@ class WinHook
 ; .. TESTS ..
 ; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... meh autohotkey doesn't do this right
 /*
-F4::
+F6::
 {
   Start := A_TickCount
   global usePixelGet
@@ -1052,7 +1223,7 @@ F4::
   }
 }
 ; TEST
-F3::
+F4::
 {
   if ((PixelGetColor(888,961) = "0x9EA6AD")
     and (PixelGetColor(889,962) = "0x98ABB5")
@@ -1065,7 +1236,7 @@ F3::
 }
 */
 
-F2::
+F3::
 {
     if (!vrObj.isMemValid())
     {
@@ -1075,7 +1246,7 @@ F2::
 
     byte := ""
     menuAddress := vrObj._menuAddress
-    byte := vrObj._vrisingMem.read(menuAddress, "UChar") ; We can read from offsets here but better to cache the final address.
+    byte := vrObj._vrisingMem.read(menuAddress, "UChar") ; We can read from offsets here but better to cache the final pitchAddress.
     MsgBox "F2: byte: " byte
 
 }
