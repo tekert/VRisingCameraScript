@@ -40,25 +40,29 @@ useMemScan := True
 ;    UnityPlyaer.dll changes less often it contains the core unity 3d engine.
 ; <more notes on pointers below>.
 
-
 scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if usesMemScan = False)
+
+lockMouseOnYaxis := 0.27
 ; Use 0.45 to 0.0 (Y axys % on where the mouse will center, 0 is top of the screen)
 ; Dont use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities. TODO: check if i can expand the camera pitch via memory
 ;   For throwing area abilities closer to you there are two ingame methods, one is tilting the camera to the ground, it helps but not enough
 ;   The other is zooming the camera with the mousewheel before launching the ability and tilting the camera.. a bit cumbersome but doable with practice. (not too bad)
 ;   The last is, pressing <script_key=shift> before throwing the ability so you can move the cursor, if the ability is on Q and the script key is shift, this is not ideal.
 ; TODO: make it so we can move the mouse on the Y axis from 0.45 to 0.25 (uhm, is possible but don't know if it's ideal, check other options)
-lockMouseOnYaxis := 0.27
+
+restoreMousePosition := False
+; True = Restores the original mouse position from before after unlocking the mouse.
+; False = Don't
 
 pitchValue := 0.4
 ; Most npcs disapear at ~50 meters or so
 ; so Ranges from 0.0 to 0.3 are a bit dissy for pvp
 ; Default is 0.6632251143
 
-; ---------------------------------
-; Please don't edit below this line (except maybe the hotkeys section)
-; ---------------------------------
 
+; ---------------------------------
+; Please don't edit below this line unless you know what you are doing (except maybe the hotkeys section)
+; ---------------------------------
 ;;; Address for memory scans ;;;;
 
 ; Array of pointer offsets taken from pointers maps where the menu state is stored:
@@ -78,11 +82,11 @@ menuModulePointerOffsets := [0xB8, 0x00, 0xB0, 0xF0, 0x40, 0x20, 0x18]
 ; "??" may be used for wildcards, like "01 02 ?? 04 05"
 ; Tested Working in  [v1.0.6]
 pitchAOB := "1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00"
-pitchOffset := 0x0
+pitchOffset := 0x0 ; 1F C9 29 3F is our pitch se offet is 0
 /*
-    DEV NOTES
+NOTE:
 
-    To find this struct on Cheat Engine, activate mono features and set a breakpoint on ProjectM-Camera TopDownCameraSystem - UpdateCameraInputs method.
+    To find this struct on Cheat Engine, activate mono features and set a breakpoint on ProjectM.Camera.dll -> ProjectM.TopdownCameraSystem -> UpdateCameraInputs method.
     Load a game.
     Look for the TopDownCameraState parameter, on v1.0.6 is the 3rd one, for example the rdx register, thats the address of this struct.
 
@@ -112,9 +116,6 @@ pitchOffset := 0x0
     DB 0F 49 3F 01 00 00 00
     00 00 78 41 00 00 00 00
 */
-; ---------------------------------
-; Please don't edit below this line (except maybe the hotkeys section)
-; ---------------------------------
 
 #Requires AutoHotkey >=2.0
 
@@ -147,6 +148,7 @@ Thread "NoTimers", True
 ; Process name (in case for some reason it changes)
 vrObj := VRising("VRising.exe", useMemScan)
 vrObj.setMenuAddresses(menuModuleName, menuModuleOffset, menuModulePointerOffsets)
+vrObj.restoreMousePosition := restoreMousePosition
 vrObj.setPitchAOB(pitchAOB, pitchOffset)
 
 vrObj.lockAxysLevel := lockMouseOnYaxis
@@ -257,6 +259,8 @@ F4:: ; <- put here your favorite key to open the console, we use de default SC02
 class VRising
 {
     processName := "VRising.exe"
+
+    restoreMousePosition := True
 
     ; Lock the mouse at this height on the Y axys on the middle of the game window
     ; Percent from 0.0 to 1.0 of the Y axys, 0.0 (0%) being the top and 1.0 (100%) the bottom.
@@ -382,13 +386,12 @@ class VRising
         }
         else
         {
-            if this._isInFocus
-                this._isInFocus := False
-            else
+            if !this._isInFocus
                 return ; If already NOT in focus return.
 
+            this._isInFocus := False
             ; Window Loses Focus, suspend hotkeys and pause scan timers
-                this.SuspendScript(True)
+            this.SuspendScript(True)
         }
     }
 
@@ -435,6 +438,7 @@ class VRising
         this._menuAddress := menuAddress
 
         ; TODO: Sadly pitch memory pitchAddress is dynamically created and its value too, so we have to scan for it every time we want the pitch changed
+        ;   no use getting the camera pitch address now, wait until the user ask for it.
     }
 
     ; Disable Timers and close Memory instance
@@ -851,7 +855,7 @@ class VRising
         {
             SendEvent("{RButton up}")
             this._cameraLocked := false
-            if (this._savedXpos = "" or this._savedYpos = "")
+            if (this._savedXpos = "" or this._savedYpos = "") or !restoreMousePosition
                 return
             else
                 MouseMove(this._savedXpos, this._savedYpos, 0)
@@ -1256,3 +1260,28 @@ F8::
     MsgBox "F2: byte: " byte
 
 }
+
+/*
+
+
+F7::
+{
+    address := 0
+    aInfo := ""
+    endAddress := vrObj._vrisingMem.isTarget64bit ? (A_PtrSize = 8 ? 0x7FFFFFFFFFF : 0xFFFFFFFF) : 0x7FFFFFFF
+
+    while address <= endAddress
+    {
+        vrObj._vrisingMem.VirtualQueryEx(address, &aInfo)
+
+        ; First search inside this block, if not there, search entire memory.
+        if (aInfo.RegionSize = 100000000)
+        {
+            break
+        }
+    }
+
+    ;  address+100000000
+
+}
+*/

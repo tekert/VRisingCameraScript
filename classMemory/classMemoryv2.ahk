@@ -1192,10 +1192,10 @@ class _ClassMemory
             if !this.VirtualQueryEx(address, &aRegion)
                 return -9
             if (aRegion.State = MEM_COMMIT
-            && !(aRegion.Protect & (PAGE_NOACCESS | PAGE_GUARD)) ; can't read these areas
-            ;&& (aRegion.Type = MEM_MAPPED || aRegion.Type = MEM_PRIVATE) ;Might as well read Image sections as well
-            && aRegion.RegionSize >= patternSize
-            && (result := this.PatternScan(address, aRegion.RegionSize, &patternMask, &AOBBuffer)) > 0)
+                    && !(aRegion.Protect & (PAGE_NOACCESS | PAGE_GUARD)) ; can't read these areas
+                    ;&& (aRegion.Type = MEM_MAPPED || aRegion.Type = MEM_PRIVATE) ;Might as well read Image sections as well
+                    && aRegion.RegionSize >= patternSize
+                    && (result := this.PatternScan(address, aRegion.RegionSize, &patternMask, &AOBBuffer)) > 0)
                 return result
         } until (address += aRegion.RegionSize) >= endAddress
         return 0
@@ -1267,10 +1267,10 @@ class _ClassMemory
             if (A_Index = 1)
                 aInfo.RegionSize -= address - aInfo.BaseAddress
             if (aInfo.State = MEM_COMMIT)
-            && !(aInfo.Protect & (PAGE_NOACCESS | PAGE_GUARD)) ; can't read these areas
-            ;&& (aInfo.Type = MEM_MAPPED || aInfo.Type = MEM_PRIVATE) ;Might as well read Image sections as well
-            && aInfo.RegionSize >= patternSize
-            && (result := this.PatternScan(address, aInfo.RegionSize, &patternMask, &AOBBuffer))
+                    && !(aInfo.Protect & (PAGE_NOACCESS | PAGE_GUARD)) ; can't read these areas
+                    ;&& (aInfo.Type = MEM_MAPPED || aInfo.Type = MEM_PRIVATE) ;Might as well read Image sections as well
+                    && aInfo.RegionSize >= patternSize
+                    && (result := this.PatternScan(address, aInfo.RegionSize, &patternMask, &AOBBuffer))
             {
                 if (result < 0 )
                     return -2
