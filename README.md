@@ -8,7 +8,7 @@ Also has some quality of life features like changing the pitch of the camera or 
  
 Download the latest zip from github [here](https://github.com/tekert/VRisingCameraScript/archive/refs/heads/master.zip)
 
-Execute the script using [Autohotkey](https://www.autohotkey.com/download/ahk-v2.exe) v2  
+Start the script using [Autohotkey](https://www.autohotkey.com/download/ahk-v2.exe) v2  
 > Double click vrising_camera.ahk 
 
 
