@@ -67,9 +67,9 @@ menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01CEE8E8
 menuModulePointerOffsets := [0xB8, 0x00, 0xB0, 0xF0, 0x40, 0x20, 0x18]
 ; NOTE:
-; To find the pitchAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05 (mark Hex and put 05),
+; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05 (mark Hex and put 05),
 ;   then go to options menu, search for 0x04, finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
-; There is your pitchAddress, now repeat this a bunch of times after reopening the game taking pointer scans after you find the pitchAddress each time,
+; There is your menuAddress, now repeat this a bunch of times after reopening the game taking pointer scans after you find the menuAddress each time,
 ; after 2 or 3 times, compare the pointer scans against the current most recent scan and pick some pointers from UnityPlayer.dll.
 
 ; Pitch cameraState structure
