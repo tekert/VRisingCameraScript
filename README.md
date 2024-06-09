@@ -11,8 +11,13 @@ Download the latest zip from github [here](https://github.com/tekert/VRisingCame
 Execute the script using [Autohotkey](https://www.autohotkey.com/download/ahk-v2.exe) v2  
 > Double click vrising_camera.ahk 
 
+
 # Config
-Inside the vrising_camera.ahk you can cofnigure the options.
+Edit `vrising_camera.ahk` you can find the options near the top of the script.
+
+For using pixel detection you need the [ImagePut](https://github.com/iseahound/ImagePut) external library
+It's not need if using the standard memory detection but mthe emory method may stop working on future game updates.
+Also, pixel detection is currently only working for 1920x1080 resolutions (you can add support easily tough if you like coding)
 
 # Hotkeys
 
