@@ -55,6 +55,12 @@ pitchValue := 0.4
 ; so Ranges from 0.0 to 0.3 are a bit dissy for pvp
 ; Default is 0.6632251143
 
+; ---------------------------------
+; Please don't edit below this line (except maybe the hotkeys section)
+; ---------------------------------
+
+;;; Address for memory scans ;;;;
+
 ; Array of pointer offsets taken from pointers maps when the menu state is stored:
 ; Tested Working from [1.0.0] to [v1.0.6]
 menuModuleName := "UnityPlayer.dll"
