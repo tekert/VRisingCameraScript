@@ -79,9 +79,13 @@ menuModulePointerOffsets := [0xB8, 0x00, 0xB0, 0xF0, 0x40, 0x20, 0x18]
 ; Tested Working in  [v1.0.6]
 pitchAOB := "1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00"
 pitchOffset := 0x0
-
 /*
     DEV NOTES
+
+    To find this struct on Cheat Engine, activate mono features and set a breakpoint on ProjectM-Camera TopDownCameraSystem - UpdateCameraInputs method.
+    Load a game.
+    Look for the TopDownCameraState parameter, on v1.0.6 is the 3rd one, for example the rdx register, thats the address of this struct.
+
     cameraState structure
     dynamically allocated
     some values like pitch derived from other values.
