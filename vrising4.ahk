@@ -1,4 +1,4 @@
-; VRising mouse lock (improves aim and reaction times)
+; VRising mouse lock script (improves aim and reaction times for some people)
 ; github.com/tekert
 ; v0.9
 
@@ -233,8 +233,9 @@ $LAlt Up::
 }
 
 ; Keyboard for console
-; This is the key above "TAB" left of "1"
-SC029:: ; <- put here your favorite key to open the console, we use de default SC029
+;SC029:: ; This is the key above "TAB" left of "1"
+
+F4:: ; <- put here your favorite key to open the console, we use de default SC029
 {
     Send '{U+0060}' ;"`" <- back accent: https://kbdlayout.info/how/%60
 }
@@ -496,31 +497,30 @@ class VRising
     {
         if (!IsFloat(pitch))
         {
-             MsgBox "valuePitch has to be a float value!"
+             MsgBox "pitch has to be a float value! instead we got " type(pitch)
              return False
         }
 
         ret := 0
-        fromAddress := 0
-        ; Change all ocurrence, this object is created at least 2 times in memory, the first one fades at garbage collection.
+        scanFromAddress := 0
+        ; Change all ocurrences, this object is created at least 2 times in memory, the first one fades at garbage collection.
         Loop
         {
-            foundAddress := this._scanCameraPitchAddress(fromAddress)
+            foundAddress := this._scanCameraPitchAddress(scanFromAddress)
             if ((foundAddress = "") or (foundAddress < 0))
             {
-                MsgBox "Could not get pitch pointer pitchAddress, setPitch error, pitchAddress returned: " pitchAddress
+                MsgBox "Could not get pitch address, setPitch error, foundAddress returned: " foundAddress
                 return False
             }
             if (foundAddress = 0)
             {
                 return ret ? True : False
             }
-            pitchAddress := foundAddress + this._pitchAOBOffset
-            fromAddress := pitchAddress + 4
+            scanFromAddress := foundAddress + 4
 
             try
             {
-                ret := this._vrisingMem.write(pitchAddress, pitch, "Float")
+                ret := this._vrisingMem.write(foundAddress, pitch, "Float")
                 ;       Non Zero -  Indicates success.
                 ;       Zero     -  Indicates failure. Check errorLevel and A_LastError for more information
                 ;       Null    -   An invalid type was passed. this.Errorlevel is set to -2 TODO: throws on v2
@@ -578,11 +578,7 @@ class VRising
                 }
             }
             else
-            {
-                 ; The last object is the valid one
-
-            }
-
+                pitchAddress += + this._pitchAOBOffset
         }
         catch Error as err
         {
@@ -884,7 +880,7 @@ class VRising
     }
 }
 
-; TODO: rewrite this.. it's not well programmed.
+
 ; Converted to ahk v2 by
 ;   github.com/tekert
 ;
@@ -1196,7 +1192,7 @@ class WinHook
 ; .. TESTS ..
 ; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... meh autohotkey doesn't do this right
 /*
-F6::
+F10::
 {
   Start := A_TickCount
   global usePixelGet
@@ -1223,7 +1219,7 @@ F6::
   }
 }
 ; TEST
-F4::
+F9::
 {
   if ((PixelGetColor(888,961) = "0x9EA6AD")
     and (PixelGetColor(889,962) = "0x98ABB5")
@@ -1236,7 +1232,7 @@ F4::
 }
 */
 
-F4::
+F8::
 {
     if (!vrObj.isMemValid())
     {
