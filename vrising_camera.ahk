@@ -61,7 +61,7 @@ pitchValue := 0.4
 
 ;;; Address for memory scans ;;;;
 
-; Array of pointer offsets taken from pointers maps when the menu state is stored:
+; Array of pointer offsets taken from pointers maps where the menu state is stored:
 ; Tested Working from [1.0.0] to [v1.0.6]
 menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01CEE8E8
