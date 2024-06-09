@@ -16,7 +16,7 @@ Start the script using [Autohotkey](https://www.autohotkey.com/download/ahk-v2.e
 Edit `vrising_camera.ahk` you can find the options near the top of the script.
 
 For using pixel detection you need the [ImagePut](https://github.com/iseahound/ImagePut) external library
-It's not need if using the standard memory detection but mthe emory method may stop working on future game updates.
+It's not need if using the standard memory detection but the memory method may stop working on future game updates.
 Also, pixel detection is currently only working for 1920x1080 resolutions (you can add support easily tough if you like coding)
 
 # Hotkeys

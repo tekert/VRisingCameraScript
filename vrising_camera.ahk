@@ -157,8 +157,8 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
 ; F1 or End key: Enables or disables the script, disabling timers and hotkeys except for F1 and End keys
 ; https://www.autohotkey.com/docs/v2/lib/Suspend.htm
 #SuspendExempt
-End::
-F1::
+~End::
+~F1::
 {
     if (A_IsSuspended)
         vrObj.SuspendScript(False, True)
@@ -168,7 +168,7 @@ F1::
 #SuspendExempt False
 
 ; This may take 20s to have effect, dont spam it :)
-F2::
+~F2::
 {
     static canSpam := 1
     if (canSpam)
@@ -588,8 +588,8 @@ class VRising
         }
         catch Error as err
         {
-            throw err
-            ;Sleep(1000)
+            Sleep(1000)
+            ;throw err
         }
 
         return pitchAddress
