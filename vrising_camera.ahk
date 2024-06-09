@@ -42,9 +42,9 @@ useMemScan := True
 
 scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if usesMemScan = False)
 
-lockMouseOnYaxis := 0.27
+lockMouseOnYaxis := 0.3
 ; Use 0.45 to 0.0 (Y axys % on where the mouse will center, 0 is top of the screen)
-; Dont use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities. TODO: check if i can expand the camera pitch via memory
+; Dont use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities.
 ;   For throwing area abilities closer to you there are two ingame methods, one is tilting the camera to the ground, it helps but not enough
 ;   The other is zooming the camera with the mousewheel before launching the ability and tilting the camera.. a bit cumbersome but doable with practice. (not too bad)
 ;   The last is, pressing <script_key=shift> before throwing the ability so you can move the cursor, if the ability is on Q and the script key is shift, this is not ideal.
@@ -65,15 +65,15 @@ pitchValue := 0.4
 ; ---------------------------------
 ;;; Address for memory scans ;;;;
 
-; Array of pointer offsets taken from pointers maps where the menu state is stored:
+; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
 ; Tested Working from [1.0.0] to [v1.0.6]
 menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01CEE8E8
 menuModulePointerOffsets := [0xB8, 0x00, 0xB0, 0xF0, 0x40, 0x20, 0x18]
 ; NOTE:
 ; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05 (mark Hex and put 05),
-;   then go to options menu, search for 0x04, finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
-; There is your menuAddress, now repeat this a bunch of times after reopening the game taking pointer scans after you find the menuAddress each time,
+;   then go to options menu ingame, search for 0x04, finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
+; There is your menuAddress, now repeat this a bunch of times after closing/start the game, taking pointer scans after you find the menuAddress each time,
 ; after 2 or 3 times, compare the pointer scans against the current most recent scan and pick some pointers from UnityPlayer.dll.
 
 ; Pitch cameraState structure
@@ -139,18 +139,17 @@ Persistent
 #HotIf WinActive("ahk_exe VRising.exe") ; By default ont enable hotkeys when game window is active. may cause weird problems when window is out of focus and hooks are disabled. TEST
 CoordMode("Mouse", "Window") ; To support the game if its in window mode
 
-WinWait("VRising")
+;WinWait("ahk_exe VRising.exe")
 
-; Make all newly launched threads below (hotkeys) higher priority?, (not interruptable by timers)
+; Make all newly launched threads (hotkeys) higher priority, (not interruptable by timers)
 ; https://www.autohotkey.com/docs/v2/lib/Thread.htm#NoTimers
 Thread "NoTimers", True
 
-; Process name (in case for some reason it changes)
+; Create the main object, this will handle everything
 vrObj := VRising("VRising.exe", useMemScan)
 vrObj.setMenuAddresses(menuModuleName, menuModuleOffset, menuModulePointerOffsets)
 vrObj.restoreMousePosition := restoreMousePosition
 vrObj.setPitchAOB(pitchAOB, pitchOffset)
-
 vrObj.lockAxysLevel := lockMouseOnYaxis
 
 ;---------------
@@ -689,13 +688,6 @@ class VRising
                 try
                 {
                     byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to cache the final address.
-                    ; Return Values:
-                    ;       integer -   Indicates success.
-                    ;       Null    -   Indicates failure. Check ErrorLevel and A_LastError for more information.
-                    ;       Note:       Since the returned integer value may be 0, to check for success/failure compare the result
-                    ;                   against null i.e. if (result = "") then an error has occurred.
-                    ;                   When reading doubles, adjusting "SetFormat, float, totalWidth.DecimalPlaces"
-                    ;                   may be required depending on your requirements.
 
                     ; TODO: error message log (but we don't want to disturb the player screen at this stage)
                     if (byte = "")

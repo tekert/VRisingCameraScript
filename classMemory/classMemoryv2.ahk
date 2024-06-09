@@ -184,7 +184,6 @@
         calc := new _ClassMemory("ahk_exe calc.exe") ; Create a new derived object to read calc's memory.
         isHandleValid() can be used to check if a target process has closed or restarted.
 */
-
 class _ClassMemory
 {
     ErrorLevel := ""
@@ -248,8 +247,6 @@ class _ClassMemory
     ; Return Values:
     ;   Object  On success an object is returned which can be used to read the processes memory.
     ;   Null    Failure. A_LastError and the optional handle parameter can be consulted for more information.
-
-
     __new(program, dwDesiredAccess := "", &handle := "", windowMatchMode := 3)
     {
         if this.PID := handle := this.findPID(program, windowMatchMode) ; set handle to 0 if program not found
@@ -339,6 +336,7 @@ class _ClassMemory
 
         return pid ? pid : 0 ; PID is null on fail, return 0
     }
+
     ; Method:   isHandleValid()
     ;           This method provides a means to check if the internal process handle is still valid
     ;           or in other words, the specific target application instance (which you have been reading from)
@@ -353,7 +351,6 @@ class _ClassMemory
     ; Notes:
     ;   This operation requires a handle with SYNCHRONIZE access rights.
     ;   All handles, even user specified ones are opened with the SYNCHRONIZE access right.
-
     isHandleValid()
     {
         return 0x102 = DllCall("WaitForSingleObject", "Ptr", this.hProcess, "UInt", 0)
@@ -375,7 +372,6 @@ class _ClassMemory
     ;   Null/blank          OpenProcess failed. If the target process has admin rights, then the script also needs to be ran as admin.
     ;                       _ClassMemory.setSeDebugPrivilege() may also be required.
     ;   Positive integer    A handle to the process.
-
     openProcess(PID, dwDesiredAccess)
     {
         r := DllCall("OpenProcess", "UInt", dwDesiredAccess, "Int", False, "UInt", PID, "Ptr")
@@ -402,7 +398,6 @@ class _ClassMemory
     ; Return Values:
     ;   Non-Zero        Success
     ;   0               Failure
-
     closeHandle(hProcess)
     {
         return DllCall("CloseHandle", "Ptr", hProcess)
@@ -414,7 +409,6 @@ class _ClassMemory
     ; Return Values:
     ;   zero or positive value      Number of bytes read/written
     ;   -1                          Failure. Shouldn't occur
-
     numberOfBytesRead()
     {
         return !this.pNumberOfBytesRead ? -1 : NumGet(this.pNumberOfBytesRead+0, "Ptr")
@@ -443,7 +437,6 @@ class _ClassMemory
     ;                   against null i.e. if (result = "") then an error has occurred.
     ;                   When reading doubles, adjusting "SetFormat, float, totalWidth.DecimalPlaces"
     ;                   may be required depending on your requirements.
-
     read(address, type := "UInt", aOffsets*)
     {
         ; If invalid type RPM() returns success (as bytes to read resolves to null in dllCall())
@@ -485,7 +478,6 @@ class _ClassMemory
     ; Notes:            The contents of the buffer may then be retrieved using AHK's NumGet() and StrGet() functions.
     ;                   This method offers significant (~30% and up) performance boost when reading large areas of memory.
     ;                   As calling ReadProcessMemory for four bytes takes a similar amount of time as it does for 1,000 bytes.
-
     readRaw(address, &bufferObj, bytes := 4, aOffsets*)
     {
         bufferObj := Buffer(bytes)
@@ -518,7 +510,6 @@ class _ClassMemory
     ;       If neither the actual or maximum size is known and the string is null terminated, then specifying
     ;       zero for the sizeBytes parameter is fine. Generally speaking for all intents and purposes the performance difference is
     ;       inconsequential.
-
     readString(address, sizeBytes := 0, encoding := "UTF-8", aOffsets*)
     {
         bufferSize := sizeBytes ? sizeBytes : 100
@@ -578,7 +569,6 @@ class _ClassMemory
     ;       By default a null terminator is included at the end of written strings.
     ;       This behaviour is determined by the property [derivedObject].insertNullTerminator
     ;       If this property is true, then a null terminator will be included.
-
     writeString(address, string, encoding := "utf-8", aOffsets*)
     {
         encodingSize := (encoding = "utf-16" || encoding = "cp1200") ? 2 : 1
@@ -603,7 +593,6 @@ class _ClassMemory
     ;       Non Zero -  Indicates success.
     ;       Zero     -  Indicates failure. Check errorLevel and A_LastError for more information
     ;       Null    -   An invalid type was passed. this.Errorlevel is set to -2 TODO: throws on v2
-
     write(address, value, type := "Uint", aOffsets*)
     {
         if !_ClassMemory.aTypeSize.Has(type)
@@ -632,7 +621,6 @@ class _ClassMemory
     ; Return Values:
     ;       Non Zero -  Indicates success.
     ;       Zero     -  Indicates failure. Check errorLevel and A_LastError for more information
-
     writeRaw(address, pBuffer, sizeBytes, aOffsets*)
     {
         return DllCall("WriteProcessMemory", "Ptr", this.hProcess, "Ptr", aOffsets.Length ? this.getAddressFromOffsets(address, aOffsets*) : address, "Ptr", pBuffer, "Ptr", sizeBytes, "Ptr", this.pNumberOfBytesWritten)
@@ -660,7 +648,6 @@ class _ClassMemory
     ;   Examples:
     ;                   writeBytes(0xAABBCC11, "DEADBEEF")          ; Writes the bytes DE AD BE EF starting at address  0xAABBCC11
     ;                   writeBytes(0xAABBCC11, [10, 20, 0xA, 2])
-
     writeBytes(address, hexStringOrByteArray, aOffsets*)
     {
         if !IsObject(hexStringOrByteArray)
@@ -688,7 +675,6 @@ class _ClassMemory
     ;       Note:       Since the returned integer value may be 0, to check for success/failure compare the result
     ;                   against null i.e. if (result = "") then an error has occurred.
     ;                   If the target application is 64bit the pointers are read as an 8 byte Int64 (this.PtrType)
-
     pointer(address, finalType := "UInt", offsets*)
     {
         For index, offset in offsets
@@ -711,7 +697,6 @@ class _ClassMemory
     ;   Negative integer    Failure
     ;   Null                Failure
     ; Note:                 If the target application is 64bit the pointers are read as an 8 byte Int64 (this.PtrType)
-
     getAddressFromOffsets(address, aOffsets*)
     {
         return  aOffsets.Pop() + this.pointer(address, this.ptrType, aOffsets*) ; remove the highest key so can use pointer() to find final memory address (minus the last offset)
@@ -744,8 +729,6 @@ class _ClassMemory
     ;   Positive integer    The base address of the process (success).
     ;   Null                The process's window couldn't be found.
     ;   0                   The GetWindowLong or GetWindowLongPtr call failed. Try getModuleBaseAddress() instead.
-
-
     getProcessBaseAddress(windowTitle, windowMatchMode := "3")
     {
         if (windowMatchMode && A_TitleMatchMode != windowMatchMode)
@@ -787,7 +770,6 @@ class _ClassMemory
     ; Notes:    A 64 bit AHK can enumerate the modules of a target 64 or 32 bit process.
     ;           A 32 bit AHK can only enumerate the modules of a 32 bit process
     ;           This method requires PROCESS_QUERY_INFORMATION + PROCESS_VM_READ access rights. These are included by default with this class.
-
     getModuleBaseAddress(moduleName := "", &aModuleInfo := "")
     {
         aModuleInfo := ""
@@ -825,7 +807,6 @@ class _ClassMemory
     ;   -1                      The specified address does not reside within a loaded module.
     ;   -3                      EnumProcessModulesEx failed.
     ;   -4                      The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process.
-
     getModuleFromAddress(address, &aModuleInfo, &offsetFromModuleBase := "")
     {
         aModuleInfo := offsetFromModule := ""
@@ -849,7 +830,6 @@ class _ClassMemory
     ; regardless of the number of programs being read (or if the target programs restart)
     ; Call this before attempting to call any other methods in this class
     ; i.e. call _ClassMemory.setSeDebugPrivilege() at the very start of the script.
-
     setSeDebugPrivilege(enable := True)
     {
         t := 0
@@ -889,7 +869,6 @@ class _ClassMemory
     ;   If the currentHandleAccess parameter does not contain these rights (or not passed) or if the hProcess (process handle) is invalid (or not passed)
     ;   a temporary handle is opened to perform this operation. Otherwise if hProcess and currentHandleAccess appear valid
     ;   the passed hProcess is used to perform the operation.
-
     isTargetProcess64Bit(PID, hProcess := "", currentHandleAccess := "")
     {
         if !A_Is64bitOS
@@ -922,12 +901,10 @@ class _ClassMemory
     ;   true stored value (address). This obfuscation can prevent Cheat Engine from finding the true origin of a pointer or links to other memory regions. If there
     ;   are no static addresses between the obfuscated address and the final destination address then CE wont find anything (there are ways around this in CE). One way around this is to
     ;   suspend the process, write the true/deobfuscated value to the address and then perform your scans. Afterwards write back the original values and resume the process.
-
     suspend()
     {
         return DllCall("ntdll\NtSuspendProcess", "Ptr", this.hProcess)
     }
-
     resume()
     {
         return DllCall("ntdll\NtResumeProcess", "Ptr", this.hProcess)
@@ -943,7 +920,6 @@ class _ClassMemory
     ;   Positive integer    The size of the aModules array. (Success)
     ;   -3                  EnumProcessModulesEx failed.
     ;   -4                  The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process.
-
     getModules(&aModules, useFileNameAsKey := False)
     {
         if (A_PtrSize = 4 && this.IsTarget64bit)
@@ -986,7 +962,6 @@ class _ClassMemory
     ; If the size of the file name is larger than the value of the nSize parameter, the function succeeds
     ; but the file name is truncated and null-terminated.
     ; If the buffer is adequate the string is still null terminated.
-
     GetModuleFileNameEx(hModule := 0, fileNameNoPath := False)
     {
         ; ANSI MAX_PATH = 260 (includes null) - unicode can be ~32K.... but no one would ever have one that size
@@ -1090,7 +1065,6 @@ class _ClassMemory
     ;                   The returned pattern can then be passed to the various pattern scan methods, for example:
     ;                   pattern := hexStringToPattern("DE AD BE EF 02")
     ;                   memObject.processPatternScan(,, pattern*)   ; Note the '*'
-
     hexStringToPattern(hexString)
     {
         AOBPattern := []
@@ -1132,7 +1106,6 @@ class _ClassMemory
     ;   Examples:
     ;                   pattern := stringToPattern("This text exists somewhere in the target program!")
     ;                   memObject.processPatternScan(,, pattern*)   ; Note the '*'
-
     stringToPattern(string, encoding := "UTF-8", insertNullTerminator := False)
     {
         if !length := StrLen(string)
@@ -1163,7 +1136,6 @@ class _ClassMemory
     ;   0               The pattern was not found inside the module
     ;   -9              VirtualQueryEx() failed
     ;   -10             The aAOBPattern* is invalid. No bytes were passed
-
     modulePatternScan(module := "", aAOBPattern*)
     {
         MEM_COMMIT := 0x1000, MEM_MAPPED := 0x40000, MEM_PRIVATE := 0x20000
@@ -1215,7 +1187,6 @@ class _ClassMemory
     ;   0                   Pattern not found
     ;   -1                  Failed to read the memory region.
     ;   -10                 An aAOBPattern pattern. No bytes were passed.
-
     addressPatternScan(startAddress, sizeOfRegionBytes, aAOBPattern*)
     {
         patternMask := ""
@@ -1246,7 +1217,6 @@ class _ClassMemory
     ;   -1                  VirtualQueryEx() failed.
     ;   -2                  Failed to read a memory region.
     ;   -10                 The aAOBPattern* is invalid. (No bytes were passed)
-
     processPatternScan(startAddress := 0, endAddress := "", aAOBPattern*)
     {
         address := startAddress
@@ -1296,7 +1266,6 @@ class _ClassMemory
     ;   >= 0                The offset of the pattern relative to the start of the haystack.
     ;   -1                  Not found.
     ;   -2                  Parameter incorrect.
-
     rawPatternScan(&bufferObj, sizeOfBufferBytes := "", startOffset := 0, aAOBPattern*)
     {
         patternMask := ""
@@ -1322,7 +1291,6 @@ class _ClassMemory
     ;                   Wild card bytes should be indicated by passing a non-numeric value eg "?".
     ; Return Values:
     ;  The number of bytes in the binary needle and hence the number of characters in the patternMask string.
-
     getNeedleFromAOBPattern(&patternMask, &needleBuffer, aAOBPattern*)
     {
         needleBuffer := Buffer(aAOBPattern.Length)
@@ -1378,7 +1346,6 @@ class _ClassMemory
     ;   Positive integer    The address of the pattern.
     ;   0                   Pattern not found.
     ;   -1                  Failed to read the region.
-
     patternScan(startAddress, sizeOfRegionBytes, &patternMask, &needleBuffer)
     {
         bufferObj := Buffer()
@@ -1406,7 +1373,6 @@ class _ClassMemory
 
     ; Notes:
     ;       This is a basic function with few safeguards. Incorrect parameters may crash the script.
-
     bufferScanForMaskedPattern(&hayStack, sizeOfHayStackBytes, &patternMask, &needle, startOffset := 0)
     {
         static p := ""
@@ -1433,7 +1399,6 @@ class _ClassMemory
     ; Use scanInBuf() machine code function - but this only supports 32 bit ahk. I could check if needle contains wild card and AHK is 32bit,
     ; then call this function. But need to do a speed comparison to see the benefits, but this should be faster. Although the benefits for
     ; the size of the memory regions be dumped would most likely be inconsequential as it's already extremely fast.
-
     MCode(mcode)
     {
         s := 0
@@ -1461,12 +1426,11 @@ class _ClassMemory
     ; The msdn documentation is unclear, and suggests that a debugger can pass either structure - perhaps there is some other step involved.
     ; My tests seem to indicate that you must pass _MEMORY_BASIC_INFORMATION i.e. structure is relative to the AHK script bitness.
     ; Another post on the net also agrees with my results.
-
+    ;
     ; Notes:
     ; A 64 bit AHK script can call this on a target 64 bit process. Issues may arise at extremely high memory addresses as AHK does not support UInt64 (but these addresses should never be used anyway).
     ; A 64 bit AHK can call this on a 32 bit target and it should work.
     ; A 32 bit AHk script can call this on a 64 bit target and it should work providing the addresses fall inside the 32 bit range.
-
     class _MEMORY_BASIC_INFORMATION
     {
         __new()
