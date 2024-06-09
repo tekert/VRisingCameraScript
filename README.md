@@ -16,18 +16,12 @@ Inside the vrising_camera.ahk you can cofnigure the options.
 
 # Hotkeys
 
-- **Shift**  
-Unhides the mouse while pressing it down
+| Hotkey | Description |
+| :--- | ----------- |
+| **Left Shift** | Unhides the mouse while pressing it down |
+| **F1** | Toggles suspension of the script, cancels any manipulation of the mouse and hotkeys | 
+| **F2** | Changes de pitch of the camera <br> NOTE: for now it only works when inside the game (not from the main menu). <br> Takes 10-20s to take effect (have to scan the entire memory, maybe in the future someone will help here)| 
+| **F4** | Open the console on any keyboard language.| 
 
-- **F1**  
-Toggles suspension of the script
-
-- **F2**  
-Changes de pitch of the camera  
-NOTE: for now it only works when inside the game (not from the main menu)  
-Takes 10-20s to take effect (have to scan the entire memory, maybe in the future someone will help here)
-
-- **F4**  
-Open the console on any keyboard language.
 
 Hope one day the devs add these options to the game.  
