@@ -32,8 +32,8 @@
 useMemScan := True
 ; Uses memory scans to check for open menus to unlock and lock the mouse, works on all resolutions but may break on a future update.
 ;   It's faster and can use lower scanMemoryInterval
-; False uses ImagePut library to buffer screenshots to analize the image por pixels belonging to menus,
-;   the caveat is it may not be that reliable on some menus, but works petty good overall.
+; False uses ImagePut library to buffer screenshots to analize the image for pixels belonging to menus,
+;   it may not be that reliable on some menus when overlay effect like tooltips or text cover the screen UI, but works petty good overall.
 ; False may need a larger scanMemoryInterval (150ms is fine when ussing ImagePut library, the default PixelGet of autohotkey take a screenshot per each Get)
 ; There are many ways to scan for somethig, like FindText library, ImageSearch (need external images) or simply scaning specific pixels on resolutions.
 ; Default is true but it needs pointer values, using CheatEngine and comparing pointer maps can get you some results,
@@ -42,7 +42,7 @@ useMemScan := True
 
 scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if usesMemScan = False)
 
-lockMouseOnYaxis := 0.3
+lockMouseOnYaxis := 0.27
 ; Use 0.45 to 0.0 (Y axys % on where the mouse will center, 0 is top of the screen)
 ; Dont use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities.
 ;   For throwing area abilities closer to you there are two ingame methods, one is tilting the camera to the ground, it helps but not enough
@@ -180,8 +180,8 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
     {
         canSpam := 0
         vrObj.setPitch(pitchValue)
+        canSpam := 1
     }
-    canSpam := 1
 }
 
 ; Temporarily disables auto mouse lock when shift is pressed.
@@ -671,7 +671,7 @@ class VRising
         return ret
     }
 
-    ; Returns true if any type of VRising menu is currently opened. false is we are in action bar wasd mode.
+    ; Returns true if any type of VRising menu is currently opened. false the camera has any type on menu that requires the mouse is open.
     ; Return values:
     ;   false/true - Any kind of Menu is open, be main menu, overlay or whatever thar requiered mouse to navigate. Or if an error ocurred returns True
     ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
@@ -687,7 +687,7 @@ class VRising
             {
                 try
                 {
-                    byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to cache the final address.
+                    byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to use the cached this._menuAddress.
 
                     ; TODO: error message log (but we don't want to disturb the player screen at this stage)
                     if (byte = "")
@@ -716,17 +716,17 @@ class VRising
                 ; Player menu open on 1920x1080
                 ; Top left border of equipment tab (has to be left, the entire middle and right sections a overlaped by tooltips sometimes)
                 if ((pic[135, 93] = 0xFF414950)
-                    and (pic[136, 93] = 0xFF414950)
-                    and (pic[137, 93] = 0xFF3A4047)
-                    and (pic[138, 93] = 0xFF2F353A))
+                        and (pic[136, 93] = 0xFF414950)
+                        and (pic[137, 93] = 0xFF3A4047)
+                        and (pic[138, 93] = 0xFF2F353A))
                     return true
 
                 ; Action bar on 1920x1080 (if action bar is not visible then we are in a fullscren menu)
                 ; (left wings on the health globe)
                 if ((pic[888, 961] != 0xFF9EA6AD)
-                    and (pic[889, 962] != 0xFF98ABB5)
-                    and (pic[890, 963] != 0xFF92A8BB)
-                    and (pic[891, 964] != 0xFF91A8B3))
+                        and (pic[889, 962] != 0xFF98ABB5)
+                        and (pic[890, 963] != 0xFF92A8BB)
+                        and (pic[891, 964] != 0xFF91A8B3))
                     return true
             }
             else
