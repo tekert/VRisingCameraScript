@@ -121,7 +121,8 @@ NOTE:
 
 ; https://github.com/Kalamity/classMemory  (converted to v2 by github.com/tekert)
 #Include %A_ScriptDir%\classMemory\classMemoryv2.ahk
-if (_ClassMemory.Prototype.__Class != "_ClassMemory") {
+if (_ClassMemory.Prototype.__Class != "_ClassMemory")
+{
     MsgBox("class memory not correctly installed. Or the (global class) variable `"_ClassMemory`" has been overwritten"
     )
     ExitApp()
@@ -176,7 +177,8 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
 ~F2::
 {
     static canSpam := 1
-    if (canSpam) {
+    if (canSpam)
+    {
         canSpam := 0
         vrObj.setPitch(pitchValue)
         canSpam := 1
@@ -200,7 +202,8 @@ $LShift Up::
 RButton::
 {
     ; Disable reading right clicks when the camera is locked (so we don't unlock it involuntarily)
-    if (vrObj.isCameraLocked()) {
+    if (vrObj.isCameraLocked())
+    {
         ; *You can send another key here to trigger an ability with the right mouse when in the field.
         return
     }
@@ -209,7 +212,8 @@ RButton::
 RButton Up::
 {
     ; Disable reading right clicks when the camera is locked (so we don't unlock it involuntarily)
-    if (vrObj.isCameraLocked()) {
+    if (vrObj.isCameraLocked())
+    {
         ; *You can release the above key here to trigger an ability with the right mouse when in the field.
         return
     }
@@ -252,7 +256,8 @@ F4:: ; <- put here your favorite key to open the console, we use de default SC02
 ; HOTKEYS END
 ; ------------
 
-class VRising {
+class VRising
+{
     processName := "VRising.exe"
 
     restoreMousePosition := True
@@ -260,7 +265,8 @@ class VRising {
     ; Lock the mouse at this height on the Y axys on the middle of the game window
     ; Percent from 0.0 to 1.0 of the Y axys, 0.0 (0%) being the top and 1.0 (100%) the bottom.
     ; Here we lock it just below 1/4 by default counting from the top of the game window
-    lockAxysLevel {
+    lockAxysLevel
+    {
         get => this._lockAxysLevel
         set
         {
@@ -297,18 +303,22 @@ class VRising {
     ; Parameters:
     ;   useMemScan  -   If false, uses PixelGet, this will have to be manually verified depending on resolution but works on all versions (if the pixels don't change)
     ;                   If True, uses the values supplied in setMenuAddresses method to scan for menu activity, works on all resolutions but maybe not all versions
-    __new(processName := "VRising.exe", useMemScan := True) {
+    __new(processName := "VRising.exe", useMemScan := True)
+    {
         this._useMemScan := useMemScan
 
-        if this._useMemScan {
+        if this._useMemScan
+        {
             if (Type(processName) = 'String')
                 this.processName := processName
             else
                 throw TypeError("Need a String type for processName")
         }
-        else {
+        else
+        {
             ; https://github.com/iseahound/ImagePut/wiki/PixelSearch-and-ImageSearch#pixelsearch
-            if (ImagePut.Prototype.__Class != "ImagePut") {
+            if (ImagePut.Prototype.__Class != "ImagePut")
+            {
                 MsgBox("class ImagePutBuffer library not correctly installed.")
                 ExitApp
             }
@@ -331,7 +341,8 @@ class VRising {
     }
 
     ; Disable Timers and events hooks and delete itself.
-    __Delete() {
+    __Delete()
+    {
         for hWinEventHook in this._winHooksArray
             WinHook.Event.UnHook(hWinEventHook)
         this._winHooksArray := ""
@@ -341,25 +352,30 @@ class VRising {
 
     ; This Method controls the internal state of this class, script suspension, stoping/resuming timer, and memory reinit if handles are no longer valid.
     ; https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wineventproc
-    _WindowChange(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime) {
+    _WindowChange(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
+    {
         processName := ""
         try
         {
             processName := WinGetProcessName("ahk_id " hwnd)
         }
-        catch Error as e {
+        catch Error as e
+        {
             ; Target could not be found, continue as false , strange, TODO: test this
         }
 
-        if (processName = this.processName) {
+        if (processName = this.processName)
+        {
             if !this._isInFocus
                 this._isInFocus := True
             else
                 return ; If already in focus return.
 
-            if (this._useMemScan) {
+            if (this._useMemScan)
+            {
                 ; If we already has a valid handle (process had not restarted) use the current loaded handle
-                if (!this.isMemValid()) {
+                if (!this.isMemValid())
+                {
                     ; Close old memory and reinit.
                     this._closeMemory()
                     this._initMemory()
@@ -368,7 +384,8 @@ class VRising {
             ; Unsuspend hotkeys and resume scan timers
             this.SuspendScript(False)
         }
-        else {
+        else
+        {
             if !this._isInFocus
                 return ; If already NOT in focus return.
 
@@ -379,8 +396,10 @@ class VRising {
     }
 
     ; Check if the process handle we have had not been closed or restarted
-    isMemValid() {
-        if (isObject(this._vrisingMem)) {
+    isMemValid()
+    {
+        if (isObject(this._vrisingMem))
+        {
             if (!this._vrisingMem.isHandleValid())
                 return False
         }
@@ -392,7 +411,8 @@ class VRising {
 
     ; Does a bunch of unit work instead of calling each function directly on event change.
     ; This only gets called from windows events (when the game is on the foreground and focused)
-    _initMemory() {
+    _initMemory()
+    {
         static errors := 0
 
         if (!ProcessExist(this.processName))
@@ -401,10 +421,12 @@ class VRising {
 retry:
         this._openMemory()
         menuAddress := this._getMenuAddress()
-        if ((menuAddress = "") or (menuAddress <= 0)) {
+        if ((menuAddress = "") or (menuAddress <= 0))
+        {
             ; An Error, wait more before trying again.
             errors += 1
-            if (errors > 10) {
+            if (errors > 10)
+            {
                 MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, menuAddress: " menuAddress
                 ExitApp
             }
@@ -420,7 +442,8 @@ retry:
     }
 
     ; Disable Timers and close Memory instance
-    _closeMemory() {
+    _closeMemory()
+    {
         this.DisableScanTimer()
 
         this._vrisingMem := ""
@@ -432,7 +455,8 @@ retry:
     }
 
     ; Opens _ClassMemory object for vrising.exe, if a handle is already opened and valid it does nothing
-    _openMemory() {
+    _openMemory()
+    {
         if (this.isMemValid())
             return
 
@@ -442,7 +466,8 @@ retry:
         hProcessCopy := 0
         vrisingMem := _ClassMemory("ahk_exe " this.processName, dwDesiredAccess, &hProcessCopy)
 
-        if !isObject(vrisingMem) {
+        if !isObject(vrisingMem)
+        {
             msgbox "Failed to open Vrising.exe handle"
             return
         }
@@ -458,7 +483,8 @@ retry:
         this._hProcess := hProcessCopy
     }
 
-    setMenuAddresses(menuModuleName := "", menuModuleOffset := 0, menuModulePointerOffsets := []) {
+    setMenuAddresses(menuModuleName := "", menuModuleOffset := 0, menuModulePointerOffsets := [])
+    {
         if (menuModuleName = "")
             throw ValueError("Please provide a valid menuModuleName to search for")
 
@@ -467,7 +493,8 @@ retry:
         this._menuModulePointerOffsets := menuModulePointerOffsets
     }
 
-    setPitchAOB(pitchAOB, pitchAOBOffset := 0x0) {
+    setPitchAOB(pitchAOB, pitchAOBOffset := 0x0)
+    {
         this._pitchAOB := pitchAOB
         this._pitchAOBOffset := pitchAOBOffset
     }
@@ -481,8 +508,10 @@ retry:
     ; Return values:
     ;   True -  Success. The memory pitchAddress of the pitch pitchAddress was written, camera pitch should change
     ;   False - Error.  Something happended and pitch was not changed.
-    setPitch(pitch) {
-        if (!IsFloat(pitch)) {
+    setPitch(pitch)
+    {
+        if (!IsFloat(pitch))
+        {
             MsgBox "pitch has to be a float value! instead we got " type(pitch)
             return False
         }
@@ -490,13 +519,16 @@ retry:
         ret := 0
         scanFromAddress := 0
         ; Change all ocurrences, this object is created at least 2 times in memory, the first one fades at garbage collection.
-        loop {
+        loop
+        {
             foundAddress := this._scanCameraPitchAddress(scanFromAddress)
-            if ((foundAddress = "") or (foundAddress < 0)) {
+            if ((foundAddress = "") or (foundAddress < 0))
+            {
                 MsgBox "Could not get pitch address, setPitch error, foundAddress returned: " foundAddress
                 return False
             }
-            if (foundAddress = 0) {
+            if (foundAddress = 0)
+            {
                 return ret ? True : False
             }
             scanFromAddress := foundAddress + 4
@@ -510,7 +542,8 @@ retry:
                 if ((ret = "") or (ret = 0))
                     return False
             }
-            catch Error as err {
+            catch Error as err
+            {
                 throw err
                 ;return False
             }
@@ -536,7 +569,8 @@ retry:
     ;   -2                  Failed to read a memory region.
     ;   -10                 The aAOBPattern* is invalid. (No bytes were passed)
     ;   -99                 Invalid handle or _ClassMemory Object, reopen handle and try again
-    _scanCameraPitchAddress(startAddress := 0, endAddress := "") {
+    _scanCameraPitchAddress(startAddress := 0, endAddress := "")
+    {
         if (!this.isMemValid())
             return -99
 
@@ -549,8 +583,10 @@ retry:
             pattern := this._vrisingMem.hexStringToPattern(this._pitchAOB)
             pitchAddress := this._vrisingMem.processPatternScan(, , pattern*) ; Note the '*'
             ; Memory Address are returned as an int decimal
-            if (pitchAddress < 0) {
-                switch pitchAddress {
+            if (pitchAddress < 0)
+            {
+                switch pitchAddress
+                {
                     case -1: MsgBox "VirtualQueryEx() failed."
                     case -2: MsgBox "Failed to read a memory region"
                     case -10: MsgBox "The aAOBPattern* is invalid. (No bytes were passed)"
@@ -559,7 +595,8 @@ retry:
             else
                 pitchAddress += +this._pitchAOBOffset
         }
-        catch Error as err {
+        catch Error as err
+        {
             Sleep(1000)
             ;throw err
         }
@@ -594,7 +631,8 @@ retry:
         0x03 = Cinamatic
         0x04 = Options - Play menu - Load game
     */
-    _getMenuAddress() {
+    _getMenuAddress()
+    {
         if (!this.isMemValid())
             return -99
 
@@ -606,8 +644,10 @@ retry:
         ;   -3 - EnumProcessModulesEx failed
         ;   -4 - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
         moduleBaseAddress := this._vrisingMem.getModuleBaseAddress(this._menuModuleName)
-        if (moduleBaseAddress < 0) {
-            switch moduleBaseAddress {
+        if (moduleBaseAddress < 0)
+        {
+            switch moduleBaseAddress
+            {
                 case -1: MsgBox "Module " this._menuModuleName " not found"
                 case -3: MsgBox "EnumProcessModulesEx failed"
                 case -4: MsgBox "The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed."
@@ -619,12 +659,14 @@ retry:
         {
             ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset, this._menuModulePointerOffsets*
             )
-            if (ret = "" or ret <= 0) {
+            if (ret = "" or ret <= 0)
+            {
                 ; TODO: url for issues.
                 MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, ret: " ret
             }
         }
-        catch Error as err {
+        catch Error as err
+        {
             ; Maybe the process is being loaded, wait and try again.
             Sleep(1000)
         }
@@ -636,13 +678,16 @@ retry:
     ; Return values:
     ;   false/true - Any kind of Menu is open, be main menu, overlay or whatever thar requiered mouse to navigate. Or if an error ocurred returns True
     ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
-    isMenuOpen() {
-        if (this._useMemScan) {
+    isMenuOpen()
+    {
+        if (this._useMemScan)
+        {
             if (!this.isMemValid())
                 throw Error("Handle is no longer valid, can't check if menu is open")
 
             byte := 0
-            if (this._menuAddress != "" and this._menuAddress > 0) {
+            if (this._menuAddress != "" and this._menuAddress > 0)
+            {
                 try
                 {
                     byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to use the cached this._menuAddress.
@@ -654,12 +699,14 @@ retry:
                     if (byte != 0x18) ; 0x18 = 23 means we are fully in action camera.
                         return True
                 }
-                catch Error as Err {
+                catch Error as Err
+                {
                     return True ;TODO: for now unlock the mouse if an trown error ocurred reading.
                 }
             }
         }
-        else {
+        else
+        {
             ; TODO more resolutions
 
             ; https://github.com/iseahound/ImagePut/wiki/PixelSearch-and-ImageSearch
@@ -667,7 +714,8 @@ retry:
             ; add 0xFF to all colors as explained in the doc. https://github.com/iseahound/ImagePut/wiki/PixelSearch-and-ImageSearch#pixelgetcolor--pixelsetcolor
             pic := ImagePutBuffer({ screenshot: "A" }) ; Take screenshot of active window.
 
-            if (pic.width = 1920) and (pic.height = 1080) {
+            if (pic.width = 1920) and (pic.height = 1080)
+            {
                 ; Player menu open on 1920x1080
                 ; Top left border of equipment tab (has to be left, the entire middle and right sections a overlaped by tooltips sometimes)
                 if ((pic[135, 93] = 0xFF414950)
@@ -684,7 +732,8 @@ retry:
                 and (pic[891, 964] != 0xFF91A8B3))
                     return true
             }
-            else {
+            else
+            {
                 MsgBox "Resolution Not supported (try full screen), Script will pause."
                 this.SuspendScript()
                 Pause 1
@@ -701,15 +750,18 @@ retry:
     ;
     ; If already suspended or unsuspended does nothing (User manual suspensions take priority)
     ; self note: It's a bit dificult to read, it was merged from two methods, maybe it was not a good idea.
-    SuspendScript(s := True, userForced := False) {
+    SuspendScript(s := True, userForced := False)
+    {
         static staySuspended := False ; Force script to stay is suspended state
 
         ; No suspended/unsuspend if the script is currently force suspended and userForced flag = false
         if ((userForced = false) and staySuspended)
             return
 
-        if (s) {
-            if (!A_IsSuspended) {
+        if (s)
+        {
+            if (!A_IsSuspended)
+            {
                 if (userForced)
                     staySuspended := True
 
@@ -717,8 +769,10 @@ retry:
             }
             this.DisableScanTimer()
         }
-        else {
-            if (A_IsSuspended) {
+        else
+        {
+            if (A_IsSuspended)
+            {
                 ; Clear the force flag if we want to unsuspend a forced suspend with userForced = True
                 if ((userForced) and staySuspended)
                     staySuspended := False
@@ -730,8 +784,10 @@ retry:
     }
 
     ; Disable the menu scan timer and unlocks the camera (called internally when suspending the script)
-    DisableScanTimer() {
-        if (!this._timerDisabled) {
+    DisableScanTimer()
+    {
+        if (!this._timerDisabled)
+        {
             SetTimer(this._scanMenusFunc, 0) ; Delete timer
             this._timerDisabled := true
             this.UnlockCamera()
@@ -739,8 +795,10 @@ retry:
     }
 
     ; Called internally when resuming the script from suspension
-    EnableScanTimer() {
-        if (this._timerDisabled) {
+    EnableScanTimer()
+    {
+        if (this._timerDisabled)
+        {
             this._timerDisabled := false
             ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
             Thread "NoTimers", False
@@ -751,7 +809,8 @@ retry:
 
     ; Timer runs this every <scan_screen_interval>
     ; This thread may be interrumped at any time.
-    _ScanMenusTimer() {
+    _ScanMenusTimer()
+    {
         ; In case this thread is resumed late.
         if (this._timerDisabled)
             return
@@ -764,17 +823,20 @@ retry:
             if (this._timerDisabled)
                 return
 
-            if (menuOpen) {
+            if (menuOpen)
+            {
                 if (this._cameraLocked)
                     this.UnlockCamera() ; execute this line only the first time
                 ; (we want to use real right clicks on build menu and this executes every <scanMemoryInterval>)
             }
-            else {
+            else
+            {
                 if (!this._cameraLocked)
                     this.LockCamera()
             }
         }
-        catch Error {
+        catch Error
+        {
             this.UnlockCamera()
             return ; maybe the memory handle is not valid or some other problem, don't disturb the player, return silently.
             ; TODO: maybe send a notification to the logs.
@@ -782,8 +844,10 @@ retry:
     }
 
     ; SendEvents are more realiable, no need to Sleep everywhere.
-    UnlockCamera() {
-        if (GetKeyState("RButton")) {
+    UnlockCamera()
+    {
+        if (GetKeyState("RButton"))
+        {
             SendEvent("{RButton up}")
             this._cameraLocked := false
             if (this._savedXpos = "" or this._savedYpos = "") or !restoreMousePosition
@@ -793,7 +857,8 @@ retry:
         }
     }
 
-    LockCamera() {
+    LockCamera()
+    {
         if (this._timerDisabled) ; Don't lock if we disabled camera lock (thread may be resumed late)
             return
 
@@ -818,7 +883,8 @@ retry:
         }
     }
 
-    isCameraLocked() {
+    isCameraLocked()
+    {
         return this._cameraLocked
     }
 }
@@ -1019,13 +1085,17 @@ retry:
 ;		Method: 	UnHookAll()
 ;
 ;{============================
-class WinHook {
-    class Shell {
+class WinHook
+{
+    class Shell
+    {
         static Hooks := Map()
         static Events := Map()
 
-        static Add(Func, wTitle := "", wClass := "", wExe := "", Event := 0) {
-            if !WinHook.Shell.Hooks {
+        static Add(Func, wTitle := "", wClass := "", wExe := "", Event := 0)
+        {
+            if !WinHook.Shell.Hooks
+            {
                 WinHook.Shell.Hooks := Map(), WinHook.Shell.Events := Map()
                 DllCall("RegisterShellHookWindow", "UInt", A_ScriptHwnd)
                 MsgNum := DllCall("RegisterWindowMessage", "Str", "SHELLHOOK")
@@ -1037,26 +1107,30 @@ class WinHook {
             WinHook.Shell.Events[Event] := true
             return WinHook.Shell.Hooks.Length
         }
-        static Remove(Index) {
+        static Remove(Index)
+        {
             WinHook.Shell.Hooks.Delete(Index)
             WinHook.Shell.Events[Index] := {}	; delete and rebuild Event list
             for key, Hook in WinHook.Shell.Hooks
                 WinHook.Shell.Events[Hook.Event] := true
         }
-        static Report(&Obj := "") {
+        static Report(&Obj := "")
+        {
             Obj := WinHook.Shell.Hooks
             for key, Hook in WinHook.Shell.Hooks
                 Display .= key "|" Hook.Event "|" Hook.Func.Name "|" Hook.Title "|" Hook.Class "|" Hook.Exe "`n"
             return Trim(Display, "`n")
         }
-        static Deregister() {
+        static Deregister()
+        {
             DllCall("DeregisterShellHookWindow", "UInt", A_ScriptHwnd)
             WinHook.Shell.Hooks := "", WinHook.Shell.Events := ""
         }
         static Message(Event, Hwnd) ; Private Method
         {
             DetectHiddenWindows(true)
-            if (WinHook.Shell.Events[Event] or WinHook.Shell.Events[0]) {
+            if (WinHook.Shell.Events[Event] or WinHook.Shell.Events[0])
+            {
 
                 wTitle := WinGetTitle("ahk_id " Hwnd)
                 wClass := WinGetClass("ahk_id " Hwnd)
@@ -1068,12 +1142,15 @@ class WinHook {
             }
         }
     }
-    class Event {
+    class Event
+    {
         static Hooks := Map()
 
-        static Add(eventMin, eventMax, eventProc, idProcess := 0, WinTitle := "") {
+        static Add(eventMin, eventMax, eventProc, idProcess := 0, WinTitle := "")
+        {
             static CB_WinEventProc := CallbackCreate(WinHook.Event.Message)
-            if !WinHook.Event.Hooks {
+            if !WinHook.Event.Hooks
+            {
                 WinHook.Event.Hooks := Map()
                 OnExit(ObjBindMethod(WinHook.Event, "UnHookAll"))
             }
@@ -1091,18 +1168,21 @@ class WinHook {
                 idProcess: idProcess, WinTitle: WinTitle }
             return hWinEventHook
         }
-        static Report(&Obj := "") {
+        static Report(&Obj := "")
+        {
             Obj := WinHook.Event.Hooks
             for hWinEventHook, Hook in WinHook.Event.Hooks
                 Display .= hWinEventHook "|" Hook.eventMin "|" Hook.eventMax "|" Hook.eventProc.Name "|" Hook.idProcess "|" Hook
                     .WinTitle "`n"
             return Trim(Display, "`n")
         }
-        static UnHook(hWinEventHook) {
+        static UnHook(hWinEventHook)
+        {
             DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
             WinHook.Event.Hooks.Delete(hWinEventHook)
         }
-        static UnHookAll() {
+        static UnHookAll()
+        {
             for hWinEventHook, Hook in WinHook.Event.Hooks
                 DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
             WinHook.Event.Hooks := "", CB_WinEventProc := ""
@@ -1166,7 +1246,8 @@ F9::
 
 F8::
 {
-    if (!vrObj.isMemValid()) {
+    if (!vrObj.isMemValid())
+    {
         MsgBox "F2: memory Invalid!"
         return
     }
