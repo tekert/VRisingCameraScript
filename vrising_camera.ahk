@@ -1,8 +1,11 @@
 ; VRising mouse lock script (improves aim and reaction times for some people)
 ; github.com/tekert
-; v0.9
+; v0.9.6
 
 ; CHANGELOG
+
+; ver 0.9.6
+; Added support for version v1.1.8.0 (will not work on older saves pre 1.1)
 
 ; ver 0.9.5
 ; Found how to change the pitch from memory (press F2 and wait 20s), sadly using AOBs,
@@ -11,19 +14,19 @@
 ; ver 0.9
 ; Almost a complete rewrite using classes, many refactors for scans.
 ; Added memory scan and pixelget options
-; Overall better hadling of inputs and window change using windows events hooks instead of autohotkey timers
+; Overall better handling of inputs and window change using windows events hooks instead of autohotkey timers
 ;
 ; ver 0.8.
 ; Better handling of key inputs and camera logic. Tested many hours ingame.
 ;
 ; ver 0.7:
 ; I prefer to use screenshots for menu detection, it's a bit cumbersome but works once set
-; Since ahk is slow for screenshots and getting pixel data, I use an external lib for that thas is 50% or more faster.
+; Since ahk is slow for screenshots and getting pixel data, I use an external lib for that that is 50% or more faster.
 ;   depends on how many pixelGets are done on base ahk, 1 ImageSearch = 2 PixelGetColor (yeah.. that bad)
 ;   the ImagePut lib 1 to X PixelGet = 1 PixelGetColor because is uses a buffer, this should be in the standard lib of ahk really.
 ; if I use memory scans it will work on all resolutions but may break on an update. (I made it, works better,
 ;   but if game updates it may break or change behaviour, discarded the code :( stick with pixels..
-; Now using ImagePut library, to uses buffers when scanning for pixels, it uses basic C, so it's fast.
+; Now using ImagePut library, to use buffers when scanning for pixels, it uses basic C, so it's fast.
 
 ; -------------
 ; User Options
@@ -31,20 +34,20 @@
 
 useMemScan := True
 ; Uses memory scans to check for open menus to unlock and lock the mouse, works on all resolutions but may break on a future update.
-;   It's faster and can use lower scanMemoryInterval
-; False uses ImagePut library to buffer screenshots to analize the image for pixels belonging to menus,
-;   it may not be that reliable on some menus when overlay effect like tooltips or text cover the screen UI, but works petty good overall.
-; False may need a larger scanMemoryInterval (150ms is fine when ussing ImagePut library, the default PixelGet of autohotkey take a screenshot per each Get)
-; There are many ways to scan for somethig, like FindText library, ImageSearch (need external images) or simply scaning specific pixels on resolutions.
+;   It's faster and can use lower scanMenuInterval
+; False uses ImagePut library to buffer screenshots to analyze the image for pixels belonging to menus,
+;   it may not be that reliable on some menus when overlay effects like tooltips or text cover the screen UI, but works pretty good overall.
+; False may need a larger scanMenuInterval (150ms is fine when using ImagePut library, the default PixelGet of autohotkey takes a screenshot per each Get)
+; There are many ways to scan for something, like FindText library, ImageSearch (need external images) or simply scanning specific pixels on resolutions.
 ; Default is true but it needs pointer values, using CheatEngine and comparing pointer maps can get you some results,
-;    UnityPlyaer.dll changes less often it contains the core unity 3d engine.
+;    UnityPlayer.dll changes less often it contains the core unity 3d engine.
 ; <more notes on pointers below>.
 
-scanMemoryInterval := 150 ; miliseconds (don't go lower than 100ms for now if usesMemScan = False)
+scanMenuInterval := 150 ; milliseconds (don't go lower than 100ms for now if useMemScan = False)
 
 lockMouseOnYaxis := 0.27
-; Use 0.45 to 0.0 (Y axys % on where the mouse will center, 0 is top of the screen)
-; Dont use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities.
+; Use 0.45 to 0.0 (Y axis % on where the mouse will center, 0 is top of the screen)
+; Don't use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities.
 ;   For throwing area abilities closer to you there are two ingame methods, one is tilting the camera to the ground, it helps but is not enough
 ;   The other is zooming the camera with the mousewheel before launching the ability and tilting the camera.. a bit cumbersome but doable with practice. (not too bad)
 ;   The last is, pressing <script_key=shift> before throwing the ability so you can move the cursor, if the ability is on Q and the script key is shift, this is not ideal.
@@ -55,14 +58,14 @@ restoreMousePosition := False
 ; False = Don't
 
 pitchValue := 0.4
-; Most npcs disapear at ~50 meters or so
-; so Ranges from 0.0 to 0.3 are a bit dissy for pvp
+; Most npcs disappear at ~50 meters or so
+; so Ranges from 0.0 to 0.3 are a bit dizzy for pvp
 ; Default is 0.6632251143
 
 ; ---------------------------------
 ; Please don't edit below this line unless you know what you are doing (except maybe the hotkeys section)
 ; ---------------------------------
-;;; Address for memory scans ;;;;
+;;; Address for memory scans ;;;
 
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
 ; Tested from [1.1.8.0] to [v1.1.8.0]
@@ -82,19 +85,19 @@ menuModulePointerOffsets := [0x238, 0x100, 0x498, 0x20, 0x18]
 ; Tested Working in  [v1.0.6]
 pitchAOB :=
     "1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00"
-pitchOffset := 0x0 ; 1F C9 29 3F is our pitch se offet is 0
+pitchOffset := 0x0 ; 1F C9 29 3F is our pitch so offset is 0
 /*
 NOTE:
 
     To find this struct on Cheat Engine, activate mono features and set a breakpoint on ProjectM.Camera.dll -> ProjectM.TopdownCameraSystem -> UpdateCameraInputs method.
     Load a game.
-    Look for the TopDownCameraState parameter, on v1.0.6 is the 3rd one, for example the rdx register, thats the address of this struct.
+    Look for the TopDownCameraState parameter, on v1.0.6 is the 3rd one, for example the rdx register, that's the address of this struct.
 
     cameraState structure
     dynamically allocated
     some values like pitch derived from other values.
     This gets created somewhere by the unity engine on game world load
-    TODO: check what the other values do.
+    TODO: check what the other values do. (already did it last year, now i forgot :) but nothing interesting.
 
     52 B8 9E 3F 6F 12 03 3B
     6F 12 03 3C 6F 12 03 3B
@@ -123,26 +126,25 @@ NOTE:
 #Include %A_ScriptDir%\classMemory\classMemoryv2.ahk
 if (_ClassMemory.Prototype.__Class != "_ClassMemory")
 {
-    MsgBox("class memory not correctly installed. Or the (global class) variable `"_ClassMemory`" has been overwritten"
-    )
+    MsgBox("Class memory not correctly installed, or the (global class) variable `"_ClassMemory`" has been overwritten.")
     ExitApp()
 }
 
 ; https://github.com/iseahound/ImagePut (only needed if we want to use pixels instead of memory for detection)
 #Include *i %A_ScriptDir%\ImagePut\ImagePut.ahk
 
-Thread "Interrupt", 0 ; Make all threads always-interruptible. instead of minimum runtime (slice) of 15ms, usefull for heavy timers.
+Thread "Interrupt", 0 ; Make all threads always-interruptible. instead of minimum runtime (slice) of 15ms, useful for heavy timers.
 SetWorkingDir(A_ScriptDir)
 #SingleInstance Force
 SendMode("Input")
 Persistent
 #MaxThreadsPerHotkey 1 ; Important, default.
-#HotIf WinActive("ahk_exe VRising.exe") ; By default ont enable hotkeys when game window is active. may cause weird problems when window is out of focus and hooks are disabled. TEST
+#HotIf WinActive("ahk_exe VRising.exe") ; By default only enable hotkeys when game window is active. may cause weird problems when window is out of focus and hooks are disabled. TEST
 CoordMode("Mouse", "Window") ; To support the game if its in window mode
 
 ;WinWait("ahk_exe VRising.exe")
 
-; Make all newly launched threads (hotkeys) higher priority, (not interruptable by timers)
+; Make all newly launched threads (hotkeys) higher priority, (not interruptible by timers)
 ; https://www.autohotkey.com/docs/v2/lib/Thread.htm#NoTimers
 Thread "NoTimers", True
 
@@ -173,7 +175,7 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
 }
 #SuspendExempt False
 
-; This may take 20s to have effect, dont spam it :)
+; This may take 20s to have effect, don't spam it :)
 ~F2::
 {
     static canSpam := 1
@@ -247,7 +249,7 @@ $LAlt Up::
 ; Keyboard for console
 ;SC029:: ; This is the key above "TAB" left of "1"
 
-F4:: ; <- put here your favorite key to open the console, we use de default SC029
+F4:: ; <- put here your favorite key to open the console, we use the default SC029
 {
     Send '{U+0060}' ;"`" <- back accent: https://kbdlayout.info/how/%60
 }
@@ -262,8 +264,8 @@ class VRising
 
     restoreMousePosition := True
 
-    ; Lock the mouse at this height on the Y axys on the middle of the game window
-    ; Percent from 0.0 to 1.0 of the Y axys, 0.0 (0%) being the top and 1.0 (100%) the bottom.
+    ; Lock the mouse at this height on the Y axis on the middle of the game window
+    ; Percent from 0.0 to 1.0 of the Y axis, 0.0 (0%) being the top and 1.0 (100%) the bottom.
     ; Here we lock it just below 1/4 by default counting from the top of the game window
     lockAxysLevel
     {
@@ -283,14 +285,14 @@ class VRising
 
     _hProcess := ""         ; HANDLE of the vrising.exe process               (not used if using pixel scans)
     _vrisingMem := ""       ; _ClassMemory Object                             (not used if using pixel scans)
-    _menuAddress := 0       ; Memory pitchAddress to check for overlay menus       (not used if using pixel scans)
+    _menuAddress := 0       ; Memory address to check for overlay menus       (not used if using pixel scans)
     _pitchAOB := ""
     _pitchAOBOffset := 0x0   ; Offset for the AOB pattern
     _winHooksArray := []
     _timerDisabled := True  ; Enable or disable auto lock with F1 key (also used internally to disable the script when shift or etc)
     _cameraLocked := False  ; True when the camera is currently locked by the script (used to play nicely with real right mouse clicks on menus)
     _isInFocus := ""
-    _menuModuleName := ""                   ; Module name of there the menu state pointer is stored.
+    _menuModuleName := ""                   ; Module name of where the menu state pointer is stored.
     _menuModuleOffset := 0              ; Module offset where the menu state pointer is inside the module
     _menuModulePointerOffsets := []     ; Array of offsets in order from pointer scans.
     _useMemScan := True
@@ -324,8 +326,8 @@ class VRising
             }
         }
 
-        ; Dont do SetTimer(ObjBindMethod(this, "_ScanMenusTimer"), 0), since it creates a new object and the timer wont be cancelled, thats why we set a Func
-        ; This is used to suspend or resume de timers that scan for menus ingame.
+        ; Don't do SetTimer(ObjBindMethod(this, "_ScanMenusTimer"), 0), since it creates a new object and the timer won't be cancelled, that's why we set a Func
+        ; This is used to suspend or resume the timers that scan for menus ingame.
         this._scanMenusFunc := ObjBindMethod(this, "_ScanMenusTimer")
         this._isInFocus := WinActive("ahk_exe " this.processName)
         this.SuspendScript(True) ; Start suspended by default TODO: check WinActive and set this.
@@ -335,7 +337,7 @@ class VRising
 
         ; When Foreground event occurs call func ForeGroundChange for any process (basically when any window comes to the foreground the func is called)
         this._winHooksArray.Push(WinHook.Event.Add(3, 3, ObjBindMethod(this, "_WindowChange"), ,)) ; 3 = EVENT_SYSTEM_FOREGROUND
-        ; Foreground wont catch some events when the game is in window mode and there are two foreground windows and one them is from the system.
+        ; Foreground won't catch some events when the game is in window mode and there are two foreground windows and one them is from the system.
         ; adding focus events complements all cases when the user or the system switch focus from the game window.
         this._winHooksArray.Push(WinHook.Event.Add(0x8005, 0x8005, ObjBindMethod(this, "_WindowChange"), ,)) ; 0x8005 = EVENT_SYSTEM_FOCUS
     }
@@ -350,7 +352,7 @@ class VRising
         this._closeMemory()
     }
 
-    ; This Method controls the internal state of this class, script suspension, stoping/resuming timer, and memory reinit if handles are no longer valid.
+    ; This Method controls the internal state of this class, script suspension, stopping/resuming timer, and memory rescan/init if handles are no longer valid.
     ; https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wineventproc
     _WindowChange(hWinEventHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime)
     {
@@ -373,7 +375,7 @@ class VRising
 
             if (this._useMemScan)
             {
-                ; If we already has a valid handle (process had not restarted) use the current loaded handle
+                ; If we already have a valid handle (process had not restarted) use the current loaded handle
                 if (!this.isMemValid())
                 {
                     ; Close old memory and reinit.
@@ -416,7 +418,7 @@ class VRising
         static errors := 0
 
         if (!ProcessExist(this.processName))
-            throw Error("Init Memory failed, process " this.processName " doesn't exists!")
+            throw Error("Init Memory failed, process " this.processName " doesn't exist!")
 
 retry:
         this._openMemory()
@@ -427,7 +429,7 @@ retry:
             errors += 1
             if (errors > 10)
             {
-                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, menuAddress: " menuAddress
+                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it on GitHub, menuAddress: " menuAddress
                 ExitApp
             }
             this._closeMemory()
@@ -437,8 +439,8 @@ retry:
         errors := 0
         this._menuAddress := menuAddress
 
-        ; TODO: Sadly pitch memory pitchAddress is dynamically created and its value too, so we have to scan for it every time we want the pitch changed
-        ;   no use getting the camera pitch address now, wait until the user ask for it.
+        ; TODO: Sadly pitch memory address is dynamically created and its value too, so we have to scan for it every time we want the pitch changed
+        ;   no use getting the camera pitch address now, wait until the user asks for it.
     }
 
     ; Disable Timers and close Memory instance
@@ -447,7 +449,7 @@ retry:
         this.DisableScanTimer()
 
         this._vrisingMem := ""
-        this._hProcess := "" ; Is closed automatically when the _classMemory object is destroyed so it's ivalid now, we delete it.
+        this._hProcess := "" ; Is closed automatically when the _classMemory object is destroyed so it's invalid now, we delete it.
         this._menuAddress := 0
 
         this._savedXpos := ""
@@ -460,7 +462,7 @@ retry:
         if (this.isMemValid())
             return
 
-        ; We need write access for chaning camera pitch values inside the game.
+        ; We need write access for changing camera pitch values inside the game.
         dwDesiredAccess := _ClassMemory.aRights.PROCESS_QUERY_INFORMATION | _ClassMemory.aRights.PROCESS_VM_READ |
             _ClassMemory.aRights.PROCESS_VM_WRITE
         hProcessCopy := 0
@@ -499,15 +501,15 @@ retry:
         this._pitchAOBOffset := pitchAOBOffset
     }
 
-    ; We have to scan every time this is called, the AOB pattern is dynamically allocated, it changes everytime a world is loaded, and the value is computen dynamically.
+    ; We have to scan every time this is called, the AOB pattern is dynamically allocated, it changes every time a world is loaded, and the value is computed dynamically.
     ; TODO: check where this value gets computed.
     ;
     ; Parameters:
     ;   pitch             4 byte Float values from 0.0 (full pitch range) to 1.0 (camera pitch locked)
     ;
     ; Return values:
-    ;   True -  Success. The memory pitchAddress of the pitch pitchAddress was written, camera pitch should change
-    ;   False - Error.  Something happended and pitch was not changed.
+    ;   True -  Success. The memory address of the pitch was written, camera pitch should change
+    ;   False - Error.  Something happened and pitch was not changed.
     setPitch(pitch)
     {
         if (!IsFloat(pitch))
@@ -518,7 +520,7 @@ retry:
 
         ret := 0
         scanFromAddress := 0
-        ; Change all ocurrences, this object is created at least 2 times in memory, the first one fades at garbage collection.
+        ; Change all occurrences, this object is created at least 2 times in memory, the first one fades at garbage collection.
         loop
         {
             foundAddress := this._scanCameraPitchAddress(scanFromAddress)
@@ -605,7 +607,7 @@ retry:
     }
 
     ; Method:   _getMenuAddress()
-    ;            Get the base addres of the open/close state of game menues
+    ;            Get the base address of the open/close state of game menus
     ;            Memory Address are returned as an int decimal
     ; Return values:
     ;   Positive integer - The module's base/load pitchAddress (success).
@@ -617,18 +619,18 @@ retry:
     /*  --------
         POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
         There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base pitchAddress
-    
-        ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = value that hold a byte with depending on wich menu is open
-    
+
+        ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = byte value based on which menu is open
+
         Byte values in game as of v1.1.8.0 [16/5/25]:
         0x18 = action camera with no menus (no inv, loot, build, plant) open
         0x1A = TAB menu, K, J open
         0x19 = ESC menu open
         0x1B = M menu open
-    
+
         Byte values in Main Menu:
         0x05 = Main Menu
-        0x03 = Cinamatic
+        0x03 = Cinematic
         0x04 = Options - Play menu - Load game
     */
     _getMenuAddress()
@@ -657,12 +659,11 @@ retry:
         ret := ""
         try
         {
-            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset, this._menuModulePointerOffsets*
-            )
+            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset, this._menuModulePointerOffsets*)
             if (ret = "" or ret <= 0)
             {
                 ; TODO: url for issues.
-                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it con github, ret: " ret
+                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it on GitHub, ret: " ret
             }
         }
         catch Error as err
@@ -676,7 +677,7 @@ retry:
 
     ; Returns true if any type of VRising menu is currently opened. false the camera has any type on menu that requires the mouse is open.
     ; Return values:
-    ;   false/true - Any kind of Menu is open, be main menu, overlay or whatever thar requiered mouse to navigate. Or if an error ocurred returns True
+    ;   false/true - Any kind of Menu is open, be main menu, overlay or whatever that required mouse to navigate. Or if an error occurred returns True
     ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
     isMenuOpen()
     {
@@ -694,14 +695,14 @@ retry:
 
                     ; TODO: error message log (but we don't want to disturb the player screen at this stage)
                     if (byte = "")
-                        return True ; TODO: for now unlock the mouse if an error ocurred reading.
+                        return True ; TODO: for now unlock the mouse if an error occurred reading.
 
-                    if (byte != 0x18) ; 0x18 = 23 means we are fully in action camera.
+                    if (byte != 0x18) ; 0x18 = means we are fully in action camera.
                         return True
                 }
                 catch Error as Err
                 {
-                    return True ;TODO: for now unlock the mouse if an trown error ocurred reading.
+                    return True ; TODO: for now unlock the mouse if a thrown error occurred reading.
                 }
             }
         }
@@ -717,14 +718,14 @@ retry:
             if (pic.width = 1920) and (pic.height = 1080)
             {
                 ; Player menu open on 1920x1080
-                ; Top left border of equipment tab (has to be left, the entire middle and right sections a overlaped by tooltips sometimes)
+                ; Top left border of equipment tab (has to be left, the entire middle and right sections are overlapped by tooltips sometimes)
                 if ((pic[135, 93] = 0xFF414950)
                 and (pic[136, 93] = 0xFF414950)
                 and (pic[137, 93] = 0xFF3A4047)
                 and (pic[138, 93] = 0xFF2F353A))
                     return true
 
-                ; Action bar on 1920x1080 (if action bar is not visible then we are in a fullscren menu)
+                ; Action bar on 1920x1080 (if action bar is not visible then we are in a fullscreen menu)
                 ; (left wings on the health globe)
                 if ((pic[888, 961] != 0xFF9EA6AD)
                 and (pic[889, 962] != 0xFF98ABB5)
@@ -734,7 +735,7 @@ retry:
             }
             else
             {
-                MsgBox "Resolution Not supported (try full screen), Script will pause."
+                MsgBox "Resolution not supported (try fullscreen), script will pause."
                 this.SuspendScript()
                 Pause 1
             }
@@ -749,10 +750,10 @@ retry:
     ;       userForced  -   Forces the script to stay suspended (e.g will only unsuspend s=False if userForced is True)
     ;
     ; If already suspended or unsuspended does nothing (User manual suspensions take priority)
-    ; self note: It's a bit dificult to read, it was merged from two methods, maybe it was not a good idea.
+    ; self note: It's a bit difficult to read, it was merged from two methods, maybe it was not a good idea.
     SuspendScript(s := True, userForced := False)
     {
-        static staySuspended := False ; Force script to stay is suspended state
+        static staySuspended := False ; Force script to stay in suspended state
 
         ; No suspended/unsuspend if the script is currently force suspended and userForced flag = false
         if ((userForced = false) and staySuspended)
@@ -802,13 +803,13 @@ retry:
             this._timerDisabled := false
             ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
             Thread "NoTimers", False
-            SetTimer(this._scanMenusFunc, scanMemoryInterval, 0)
+            SetTimer(this._scanMenusFunc, scanMenuInterval, 0)
             Thread "NoTimers", True
         }
     }
 
-    ; Timer runs this every <scan_screen_interval>
-    ; This thread may be interrumped at any time.
+    ; Timer runs this every <scanMenuInterval>
+    ; This thread may be interrupted at any time.
     _ScanMenusTimer()
     {
         ; In case this thread is resumed late.
@@ -827,7 +828,7 @@ retry:
             {
                 if (this._cameraLocked)
                     this.UnlockCamera() ; execute this line only the first time
-                ; (we want to use real right clicks on build menu and this executes every <scanMemoryInterval>)
+                ; (we want to use real right clicks on build menu and this executes every <scanMenuInterval>)
             }
             else
             {
@@ -843,7 +844,7 @@ retry:
         }
     }
 
-    ; SendEvents are more realiable, no need to Sleep everywhere.
+    ; SendEvents are more reliable, no need to Sleep everywhere.
     UnlockCamera()
     {
         if (GetKeyState("RButton"))
@@ -862,23 +863,23 @@ retry:
         if (this._timerDisabled) ; Don't lock if we disabled camera lock (thread may be resumed late)
             return
 
-        if (A_IsSuspended) ; Don't lock the camera id the script is suspended
+        if (A_IsSuspended) ; Don't lock the camera if the script is suspended
             return
 
-        if !WinActive("ahk_exe " this.processName) ; Also don't lock it if its not active.
+        if !WinActive("ahk_exe " this.processName) ; Also don't lock it if it's not active.
             return
 
         if (!GetKeyState("RButton")) ; Don't lock if the user is using the right click, wait until release
         {
             WinGetPos &Window_X, &Window_Y, &Window_Width, &Window_Height, "A"
-            MouseGetPos &_savedXpos, &_savedYpos ; Save current mouse postion before moving it, so we can restore it later.
+            MouseGetPos &_savedXpos, &_savedYpos ; Save current mouse position before moving it, so we can restore it later.
             this._savedXpos := _savedXpos, this._savedYpos := _savedYpos
             BlockInput "MouseMove"
-            MouseMove(Window_Width * 0.5, Window_Height * this._lockAxysLevel, 0) ; Move the mouse it a the top middle
+            MouseMove(Window_Width * 0.5, Window_Height * this._lockAxysLevel, 0) ; Move the mouse to the top middle
             Sleep(30) ; Needed for some edge cases when releasing some keys rapidly causes mouse to drag the screen.
             this._cameraLocked := true
-            SendEvent("{RButton down}") ; SendInput sometimes shifts the mouse  before sending rbutton down with the game
-            ; if the user  moves the mouse too quickly when relocking the camera.
+            SendEvent("{RButton down}") ; SendInput sometimes shifts the mouse before sending rbutton down with the game
+            ; if the user moves the mouse too quickly when relocking the camera.
             BlockInput "MouseMoveOff"
         }
     }
