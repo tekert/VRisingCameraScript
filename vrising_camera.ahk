@@ -803,43 +803,28 @@ retry:
     }
 
     ; Disable the menu scan timer and unlocks the camera (called internally when suspending the script)
+    ; Not interruptable by timers
     DisableScanTimer()
     {
-        Critical "On"  ; Enter critical section
-        try
+        if (!this._timerDisabled)
         {
-            if (!this._timerDisabled)
-            {
-                SetTimer(this._scanMenusFunc, 0) ; Delete timer
-                this._timerDisabled := true
-                this.UnlockCamera()
-            }
+            SetTimer(this._scanMenusFunc, 0) ; Delete timer
+            this._timerDisabled := true
+            this.UnlockCamera()
         }
-        finally
-        {
-            Critical "Off"
-        }
-
     }
 
     ; Called internally when resuming the script from suspension
+    ; Not interruptable by timers
     EnableScanTimer()
     {
-        Critical "On"
-        try
+        if (this._timerDisabled)
         {
-            if (this._timerDisabled)
-            {
-                this._timerDisabled := false
-                ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
-                Thread "NoTimers", False
-                SetTimer(this._scanMenusFunc, scanMenuInterval, 0)
-                Thread "NoTimers", True
-            }
-        }
-        finally
-        {
-            Critical "Off"
+            this._timerDisabled := false
+            ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
+            Thread "NoTimers", False
+            SetTimer(this._scanMenusFunc, scanMenuInterval, 0)
+            Thread "NoTimers", True
         }
     }
 
