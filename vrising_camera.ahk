@@ -5,7 +5,7 @@
 ; CHANGELOG
 
 ; ver 0.9.6
-; Added support for version v1.1.8.0 (will not work on older saves pre 1.1)
+; Added support for version v1.1.8.0 (will not work on older saves pre v1.1)
 
 ; ver 0.9.5
 ; Found how to change the pitch from memory (press F2 and wait 20s), sadly using AOBs,
@@ -28,11 +28,12 @@
 ;   but if game updates it may break or change behaviour, discarded the code :( stick with pixels..
 ; Now using ImagePut library, to use buffers when scanning for pixels, it uses basic C, so it's fast.
 
-; -------------
+; ========================
 ; User Options
-; -------------
+; ========================
 
 useMemScan := True
+; Default: True
 ; Uses memory scans to check for open menus to unlock and lock the mouse, works on all resolutions but may break on a future update.
 ;   It's faster and can use lower scanMenuInterval
 ; False uses ImagePut library to buffer screenshots to analyze the image for pixels belonging to menus,
@@ -44,45 +45,55 @@ useMemScan := True
 ; <more notes on pointers below>.
 
 scanMenuInterval := 150 ; milliseconds (don't go lower than 100ms for now if useMemScan = False)
+; Default: 150ms
 
 lockMouseOnYaxis := 0.27
+; Default: 0.27
 ; Use 0.45 to 0.0 (Y axis % on where the mouse will center, 0 is top of the screen)
 ; Don't use more than ~30% for the Y axis or you can't use the maximum distance on ground abilities.
 ;   For throwing area abilities closer to you there are two ingame methods, one is tilting the camera to the ground, it helps but is not enough
-;   The other is zooming the camera with the mousewheel before launching the ability and tilting the camera.. a bit cumbersome but doable with practice. (not too bad)
+;  *The other is zooming the camera with the mousewheel before launching the ability and tilting the camera.. a bit cumbersome but doable with practice. (not too bad)
 ;   The last is, pressing <script_key=shift> before throwing the ability so you can move the cursor, if the ability is on Q and the script key is shift, this is not ideal.
+;     (instead of shift we could use a mouse side button if available, but it may not be ideal for all players)
 ; TODO: make it so we can move the mouse on the Y axis from 0.45 to 0.25 (uhm, is possible but don't know if it's ideal, check other options)
 
 restoreMousePosition := False
+; Default: False
 ; True = Restores the original mouse position from before after unlocking the mouse.
 ; False = Don't
 
 pitchValue := 0.4
+; Default: 0.4
+; Default in engine is 0.6632251143
+; Used when F2 is pressed, this is the value that will be set to the camera pitch.
 ; Most npcs disappear at ~50 meters or so
 ; so Ranges from 0.0 to 0.3 are a bit dizzy for pvp
-; Default is 0.6632251143
 
 ; ---------------------------------
 ; Please don't edit below this line unless you know what you are doing (except maybe the hotkeys section)
 ; ---------------------------------
-;;; Address for memory scans ;;;
 
+; (Address will be cached and scanned every scanMenuInterval to check the current state of menus ingame)
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
 ; Tested from [1.1.8.0] to [v1.1.8.0]
 menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01CF7AC0
 menuModulePointerOffsets := [0x238, 0x100, 0x498, 0x20, 0x18]
 ; NOTE:
-; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05 (mark Hex and put 05),
-;   then go to options menu ingame, search for 0x04, finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
-; That is your menuAddress, now repeat this a bunch of times after closing/start the game, taking pointer scans after you find the menuAddress each time,
-; after 2 or 3 times, compare the pointer scans against the current most recent scan and pick some pointers from UnityPlayer.dll.
+; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05
+; (mark Hex and put 05), finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
+; Repeat multiple times until one value remains.
+; (optionally go to Load menu and search for 0x04)
+;
+; That is your menuAddress, now repeat this a bunch of times after closing/start the game, generating pointer maps each time.
+; after 2 or 3 times, scan and compare the prior pointer scans against the current most recent scan and pick some pointers
+; from UnityPlayer.dll.
 
 ; Pitch cameraState structure
 ; This value gets created dynamically each time a world is loaded, the final value of the pitch is always a float = 0,6632251143 or AOB = 1F C9 29 3F little endian
 ; AOB of structure: 1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00
 ; "??" may be used for wildcards, like "01 02 ?? 04 05"
-; Tested Working in  [v1.0.6]
+; Tested Working in  [v1.06] to [v1.1.8.0]
 pitchAOB :=
     "1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00"
 pitchOffset := 0x0 ; 1F C9 29 3F is our pitch so offset is 0
@@ -97,7 +108,7 @@ NOTE:
     dynamically allocated
     some values like pitch derived from other values.
     This gets created somewhere by the unity engine on game world load
-    TODO: check what the other values do. (already did it last year, now i forgot :) but nothing interesting.
+    TODO: check what the other values do. (already did it last year, now i forgot :| but nothing interesting.
 
     52 B8 9E 3F 6F 12 03 3B
     6F 12 03 3C 6F 12 03 3B
@@ -113,12 +124,16 @@ NOTE:
     00 00 40 41 00 00 40 41
     00 00 40 40 00 00 60 41
     C0 92 81 3F
-    1F C9 29 3F               <- Here is our pitch float
+    1F C9 29 3F               <- Here is our pitch (float)
     00 00 60 41 00 00 A0 40
     00 00 78 41 36 8D A7 3F
     DB 0F 49 3F 01 00 00 00
     00 00 78 41 00 00 00 00
 */
+
+; =====================================================
+; END User Options
+; =====================================================
 
 #Requires AutoHotkey >=2.0
 
@@ -126,7 +141,8 @@ NOTE:
 #Include %A_ScriptDir%\classMemory\classMemoryv2.ahk
 if (_ClassMemory.Prototype.__Class != "_ClassMemory")
 {
-    MsgBox("Class memory not correctly installed, or the (global class) variable `"_ClassMemory`" has been overwritten.")
+    MsgBox(
+        "Class memory not correctly installed, or the (global class) variable `"_ClassMemory`" has been overwritten.")
     ExitApp()
 }
 
@@ -175,7 +191,7 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
 }
 #SuspendExempt False
 
-; This may take 20s to have effect, don't spam it :)
+; This may take up to 1sec to 20sec to have effect, don't spam it :)
 ~F2::
 {
     static canSpam := 1
@@ -626,7 +642,7 @@ retry:
         0x18 = action camera with no menus (no inv, loot, build, plant) open
         0x1A = TAB menu, K, J open
         0x19 = ESC menu open
-        0x1B = M menu open
+        0x17 = M menu open
 
         Byte values in Main Menu:
         0x05 = Main Menu
@@ -659,7 +675,8 @@ retry:
         ret := ""
         try
         {
-            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset, this._menuModulePointerOffsets*)
+            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset,
+                this._menuModulePointerOffsets*)
             if (ret = "" or ret <= 0)
             {
                 ; TODO: url for issues.
@@ -787,24 +804,41 @@ retry:
     ; Disable the menu scan timer and unlocks the camera (called internally when suspending the script)
     DisableScanTimer()
     {
-        if (!this._timerDisabled)
+        Critical "On"  ; Enter critical section
+        try
         {
-            SetTimer(this._scanMenusFunc, 0) ; Delete timer
-            this._timerDisabled := true
-            this.UnlockCamera()
+            if (!this._timerDisabled)
+            {
+                SetTimer(this._scanMenusFunc, 0) ; Delete timer
+                this._timerDisabled := true
+                this.UnlockCamera()
+            }
         }
+        finally
+        {
+            Critical "Off"
+        }
+
     }
 
     ; Called internally when resuming the script from suspension
     EnableScanTimer()
     {
-        if (this._timerDisabled)
+        Critical "On"
+        try
         {
-            this._timerDisabled := false
-            ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
-            Thread "NoTimers", False
-            SetTimer(this._scanMenusFunc, scanMenuInterval, 0)
-            Thread "NoTimers", True
+            if (this._timerDisabled)
+            {
+                this._timerDisabled := false
+                ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
+                Thread "NoTimers", False
+                SetTimer(this._scanMenusFunc, scanMenuInterval, 0)
+                Thread "NoTimers", True
+            }
+        }
+        finally
+        {
+            Critical "Off"
         }
     }
 
@@ -812,17 +846,13 @@ retry:
     ; This thread may be interrupted at any time.
     _ScanMenusTimer()
     {
-        ; In case this thread is resumed late.
-        if (this._timerDisabled)
-            return
-
+        Critical "On"
         try
         {
-            menuOpen := this.isMenuOpen()
-
-            ; In case this thread is resumed late.
             if (this._timerDisabled)
                 return
+
+            menuOpen := this.isMenuOpen()
 
             if (menuOpen)
             {
@@ -835,12 +865,17 @@ retry:
                 if (!this._cameraLocked)
                     this.LockCamera()
             }
+
         }
         catch Error
         {
             this.UnlockCamera()
             return ; maybe the memory handle is not valid or some other problem, don't disturb the player, return silently.
             ; TODO: maybe send a notification to the logs.
+        }
+        finally
+        {
+            Critical "Off"
         }
     }
 
@@ -890,7 +925,7 @@ retry:
     }
 }
 
-; Converted to ahk v2 by
+; Converted to ahk v2 (and fixed some memory managament) by
 ;   github.com/tekert
 ;
 ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=59149
@@ -1149,7 +1184,7 @@ class WinHook
 
         static Add(eventMin, eventMax, eventProc, idProcess := 0, WinTitle := "")
         {
-            static CB_WinEventProc := CallbackCreate(WinHook.Event.Message)
+            WinEventProcPtr := CallbackCreate(WinHook.Event.Message)
             if !WinHook.Event.Hooks
             {
                 WinHook.Event.Hooks := Map()
@@ -1159,14 +1194,20 @@ class WinHook
                 , "UInt", eventMin						;  UINT eventMin
                 , "UInt", eventMax						;  UINT eventMax
                 , "Ptr", 0x0							;  HMODULE hmodWinEventProc
-                , "Ptr", CB_WinEventProc				;  WINEVENTPROC lpfnWinEventProc
+                , "Ptr", WinEventProcPtr				;  WINEVENTPROC lpfnWinEventProc
                 , "UInt", idProcess						;  DWORD idProcess
                 , "UInt", 0x0							;  DWORD idThread
                 , "UInt", 0x0 | 0x2) 					;  UINT dwflags, OutOfContext|SkipOwnProcess
             if !IsObject(eventProc)
                 eventProc := %eventProc%
-            WinHook.Event.Hooks[hWinEventHook] := { eventMin: eventMin, eventMax: eventMax, eventProc: eventProc,
-                idProcess: idProcess, WinTitle: WinTitle }
+            WinHook.Event.Hooks[hWinEventHook] := {
+                eventMin: eventMin,
+                eventMax: eventMax,
+                eventProc: eventProc,
+                idProcess: idProcess,
+                WinTitle: WinTitle,
+                callback: WinEventProcPtr  ; Save callback pointer
+            }
             return hWinEventHook
         }
         static Report(&Obj := "")
@@ -1179,14 +1220,24 @@ class WinHook
         }
         static UnHook(hWinEventHook)
         {
+            if !WinHook.Event.Hooks.Has(hWinEventHook)
+                return
+            ; Get the callback before removing the hook
+            local callback := WinHook.Event.Hooks[hWinEventHook].callback
             DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
+            CallbackFree(callback)
             WinHook.Event.Hooks.Delete(hWinEventHook)
         }
         static UnHookAll()
         {
             for hWinEventHook, Hook in WinHook.Event.Hooks
+            {
+                ; Free callback for each hook
+                CallbackFree(Hook.callback)
                 DllCall("UnhookWinEvent", "Ptr", hWinEventHook)
-            WinHook.Event.Hooks := "", CB_WinEventProc := ""
+            }
+
+            WinHook.Event.Hooks := Map()
         }
         static Message(event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime) ; 'Private Method
         {
@@ -1203,7 +1254,7 @@ class WinHook
 }
 
 ; .. TESTS ..
-; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... meh autohotkey doesn't do this right
+; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... uhmm autohotkey doesn't do this right
 /*
 F10::
 {
