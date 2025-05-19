@@ -55,6 +55,7 @@ lockMouseOnYaxis := 0.27
 ;  *The other is zooming the camera with the mousewheel before launching the ability and tilting the camera.. a bit cumbersome but doable with practice. (not too bad)
 ;   The last is, pressing <script_key=shift> before throwing the ability so you can move the cursor, if the ability is on Q and the script key is shift, this is not ideal.
 ;     (instead of shift we could use a mouse side button if available, but it may not be ideal for all players)
+; If using a pitch float value of 0.4, then we can increase the Y axis to 0.3 - 0.38 (we have greater angle play with ranged abilities)
 ; TODO: make it so we can move the mouse on the Y axis from 0.45 to 0.25 (uhm, is possible but don't know if it's ideal, check other options)
 
 restoreMousePosition := False
@@ -642,7 +643,7 @@ retry:
         0x18 = action camera with no menus (no inv, loot, build, plant) open
         0x1A = TAB menu, K, J open
         0x19 = ESC menu open
-        0x17 = M menu open
+        0x1B = Map menu open
 
         Byte values in Main Menu:
         0x05 = Main Menu
