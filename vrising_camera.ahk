@@ -1,5 +1,5 @@
 ; VRising mouse lock script (improves aim and reaction times for some people)
-; github.com/tekert
+; https://github.com/tekert/VRisingCameraScript/
 ; v0.9.6
 
 ; CHANGELOG
@@ -454,7 +454,7 @@ retry:
             goto retry
         }
         errors := 0
-        this._menuAddress := menuAddress
+        this._menuAddress := menuAddress ; Cache the final menu address
 
         ; TODO: Sadly pitch memory address is dynamically created and its value too, so we have to scan for it every time we want the pitch changed
         ;   no use getting the camera pitch address now, wait until the user asks for it.
@@ -502,6 +502,7 @@ retry:
         this._hProcess := hProcessCopy
     }
 
+    ; This is used to set the module name and offsets where the menu state is stored.
     setMenuAddresses(menuModuleName := "", menuModuleOffset := 0, menuModulePointerOffsets := [])
     {
         if (menuModuleName = "")
@@ -627,7 +628,7 @@ retry:
     ;            Get the base address of the open/close state of game menus
     ;            Memory Address are returned as an int decimal
     ; Return values:
-    ;   Positive integer - The module's base/load pitchAddress (success).
+    ;   Positive integer - The menu/overlay state address (success).
     ;   -1  - Module not found
     ;   -3  - EnumProcessModulesEx failed
     ;   -4  - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
@@ -635,7 +636,7 @@ retry:
     ;
     /*  --------
         POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
-        There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base pitchAddress
+        There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
 
         ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = byte value based on which menu is open
 
@@ -658,7 +659,7 @@ retry:
         if ((this._menuAddress != "") and (this._menuAddress > 0))
             return this._menuAddress
 
-        ; Positive integer - The module's base/load pitchAddress (success).
+        ; Positive integer -The menu/overlay state address (success).
         ;   -1 - Module not found
         ;   -3 - EnumProcessModulesEx failed
         ;   -4 - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
@@ -687,16 +688,18 @@ retry:
         catch Error as err
         {
             ; Maybe the process is being loaded, wait and try again.
-            Sleep(1000)
+            Sleep(500)
         }
 
         return ret
     }
 
-    ; Returns true if any type of VRising menu is currently opened. false the camera has any type on menu that requires the mouse is open.
-    ; Return values:
-    ;   false/true - Any kind of Menu is open, be main menu, overlay or whatever that required mouse to navigate. Or if an error occurred returns True
+    ; Return Values:
+    ;   True: if any type of VRising menu is currently opened.
+    ;   False: the camera has any type on menu that requires mouse cursor is open.
     ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
+    ;
+    ;   throws on error.
     isMenuOpen()
     {
         if (this._useMemScan)
@@ -707,26 +710,25 @@ retry:
             byte := 0
             if (this._menuAddress != "" and this._menuAddress > 0)
             {
-                try
-                {
-                    byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to use the cached this._menuAddress.
+                byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to use the cached menuAddress.
 
-                    ; TODO: error message log (but we don't want to disturb the player screen at this stage)
-                    if (byte = "")
-                        return True ; TODO: for now unlock the mouse if an error occurred reading.
-
-                    if (byte != 0x18) ; 0x18 = means we are fully in action camera.
-                        return True
-                }
-                catch Error as Err
+                ; Error
+                if (byte = "")
                 {
-                    return True ; TODO: for now unlock the mouse if a thrown error occurred reading.
+                    if this._vrisingMem.ErrorLevel == -2
+                        throw Error("Wrong type passed to _vrisingMem.read() method")
+
+                    throw OSError()
                 }
+
+                ;! TODO: when a clan member dies, this no longer works until the player respawns or time passes, investigate.
+                if (byte != 0x18) ; 0x18 = means we are fully in action camera v1.1.8.0
+                    return True
             }
         }
         else
         {
-            ; TODO more resolutions
+            ; TODO2: This else block is no longer updated, we leave it here for reference, the memory scan is more reliable and works on all resolutions.
 
             ; https://github.com/iseahound/ImagePut/wiki/PixelSearch-and-ImageSearch
             ; https://github.com/iseahound/ImagePut/wiki/Input-Types-&-Output-Functions#input-types
@@ -829,10 +831,9 @@ retry:
     }
 
     ; Timer runs this every <scanMenuInterval>
-    ; This thread may be interrupted at any time.
+    ; This thread may be interrupted at any time. (dont lock it with critical)
     _ScanMenusTimer()
     {
-        Critical "On"
         try
         {
             if (this._timerDisabled)
@@ -855,13 +856,10 @@ retry:
         }
         catch Error
         {
+            MsgBox "Error in _ScanMenusTimer: " Error.Message
             this.UnlockCamera()
-            return ; maybe the memory handle is not valid or some other problem, don't disturb the player, return silently.
-            ; TODO: maybe send a notification to the logs.
-        }
-        finally
-        {
-            Critical "Off"
+            return ; the memory handle is not valid or some other problem
+            ; TODO: send a notification to the logs instead of MsgBox.
         }
     }
 
@@ -1292,7 +1290,7 @@ F8::
 
     byte := ""
     menuAddress := vrObj._menuAddress
-    byte := vrObj._vrisingMem.read(menuAddress, "UChar") ; We can read from offsets here but better to cache the final pitchAddress.
+    byte := vrObj._vrisingMem.read(menuAddress, "UChar") ; We can read from offsets here but better to cache the final menuAddress.
     MsgBox "F2: byte: " byte
 
 }
