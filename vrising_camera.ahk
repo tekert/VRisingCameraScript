@@ -1,6 +1,6 @@
 ; VRising mouse lock script (improves aim and reaction times for some people)
 ; https://github.com/tekert/VRisingCameraScript/
-; v0.9.6
+; v0.9.7
 
 ; CHANGELOG
 
@@ -76,10 +76,10 @@ pitchValue := 0.4
 
 ; (Address will be cached and scanned every scanMenuInterval to check the current state of menus ingame)
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
-; Tested from [1.1.8.0] to [v1.1.8.0]
+; Tested from [1.1.9.0] to [v1.1.9.0]
 menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01CF7AC0
-menuModulePointerOffsets := [0x238, 0x100, 0x498, 0x20, 0x18]
+menuModulePointerOffsets := [0x238, 0x268, 0x530, 0x20, 0x18]
 ; NOTE:
 ; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05
 ; (mark Hex and put 05), finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
@@ -94,7 +94,7 @@ menuModulePointerOffsets := [0x238, 0x100, 0x498, 0x20, 0x18]
 ; This value gets created dynamically each time a world is loaded, the final value of the pitch is always a float = 0,6632251143 or AOB = 1F C9 29 3F little endian
 ; AOB of structure: 1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00
 ; "??" may be used for wildcards, like "01 02 ?? 04 05"
-; Tested Working in  [v1.06] to [v1.1.8.0]
+; Tested from [v1.06] to [v1.1.9.0]
 pitchAOB :=
     "1F C9 29 3F 00 00 60 41 00 00 A0 40 00 00 78 41 36 8D A7 3F DB 0F 49 3F 01 00 00 00 00 00 78 41 00 00 00 00"
 pitchOffset := 0x0 ; 1F C9 29 3F is our pitch so offset is 0
@@ -637,15 +637,15 @@ retry:
     /*  --------
         POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
         There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
-
+    
         ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = byte value based on which menu is open
-
+    
         Byte values in game as of v1.1.8.0 [16/5/25]:
         0x18 = action camera with no menus (no inv, loot, build, plant) open
         0x1A = TAB menu, K, J open
         0x19 = ESC menu open
         0x1B = Map menu open
-
+    
         Byte values in Main Menu:
         0x05 = Main Menu
         0x03 = Cinematic
@@ -856,7 +856,7 @@ retry:
         }
         catch Error
         {
-            MsgBox "Error in _ScanMenusTimer: " Error.Message
+            ; MsgBox "Error in _ScanMenusTimer: " Error.Number, Error.Message ; Debug
             this.UnlockCamera()
             return ; the memory handle is not valid or some other problem
             ; TODO: send a notification to the logs instead of MsgBox.
