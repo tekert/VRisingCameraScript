@@ -2,8 +2,6 @@
 Uses memory or pixel detection to check when to unhide the mouse.
 Also has some quality of life features like changing the pitch of the camera or making more complex hotkeys.
 
-> Tested up until 1.1.8.1
-
 # Install
  
 Download the latest zip from github [here](https://github.com/tekert/VRisingCameraScript/archive/refs/heads/master.zip)
