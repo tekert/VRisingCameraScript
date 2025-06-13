@@ -25,6 +25,8 @@ Also, pixel detection is currently only working for 1920x1080 resolutions (you c
 | **F1** | Toggles suspension of the script, cancels any manipulation of the mouse and hotkeys | 
 | **F2** | Changes de pitch of the camera <br> NOTE: for now it only works when inside the game (not from the main menu). <br> Takes 10-20s to take effect (have to scan the entire memory, maybe in the future someone will help here)| 
 | **F4** | Open the console on any keyboard language.| 
+| **F6** | Enable crosshair (drawn where the mouse is locked), Disabled by default.
+| **F7** | Disable crosshair
 
 
 Hope one day the devs add these options to the game.  

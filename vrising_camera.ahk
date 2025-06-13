@@ -70,6 +70,10 @@ pitchValue := 0.4
 ; Most npcs disappear at ~50 meters or so
 ; so Ranges from 0.0 to 0.3 are a bit dizzy for pvp
 
+showDot := False
+; Default: False
+; Shows a dot on the center of the screen when the camera is locked, useful to know where the mouse is locked.
+
 ; ---------------------------------
 ; Please don't edit below this line unless you know what you are doing (except maybe the hotkeys section)
 ; ---------------------------------
@@ -171,6 +175,7 @@ vrObj.setMenuAddresses(menuModuleName, menuModuleOffset, menuModulePointerOffset
 vrObj.restoreMousePosition := restoreMousePosition
 vrObj.setPitchAOB(pitchAOB, pitchOffset)
 vrObj.lockAxysLevel := lockMouseOnYaxis
+vrObj.showDot := showDot
 
 ;---------------
 ;--- HOTKEYS ---
@@ -192,7 +197,7 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
 }
 #SuspendExempt False
 
-; This may take up to 1sec to 20sec to have effect, don't spam it :)
+; F2: This may take up to 1sec to 20sec to have effect, don't spam it :)
 ~F2::
 {
     static canSpam := 1
@@ -202,6 +207,20 @@ vrObj.lockAxysLevel := lockMouseOnYaxis
         vrObj.setPitch(pitchValue)
         canSpam := 1
     }
+}
+
+; F3: Remove all dots and disable the dot on the center of the screen.
+~F6::
+{
+    vrObj.showDot := False
+    ; Remove all dots
+    vrObj.RemoveDot()
+}
+
+; F4: Show a dot on the center of the screen when the camera is locked.
+~F7::
+{
+    vrObj.showDot := True
 }
 
 ; Temporarily disables auto mouse lock when shift is pressed.
@@ -280,6 +299,7 @@ class VRising
     processName := "VRising.exe"
 
     restoreMousePosition := True
+    showDot := True ; Show a dot on the center of the screen when the camera is locked.
 
     ; Lock the mouse at this height on the Y axis on the middle of the game window
     ; Percent from 0.0 to 1.0 of the Y axis, 0.0 (0%) being the top and 1.0 (100%) the bottom.
@@ -318,6 +338,8 @@ class VRising
     ;   since its not static, it creates a new object on each call.
     _savedXpos := ""        ; Save mouse X position before locking it with right click
     _savedYpos := ""        ; Save mouse Y position before locking it with right click
+
+    _overlayGui := "" ; Crosshair GUI, used to show the current camera pitch and lock state
 
     ; Parameters:
     ;   useMemScan  -   If false, uses PixelGet, this will have to be manually verified depending on resolution but works on all versions (if the pixels don't change)
@@ -870,6 +892,7 @@ retry:
         {
             SendEvent("{RButton up}")
             this._cameraLocked := false
+            this.RemoveDot()
             if (this._savedXpos = "" or this._savedYpos = "") or !restoreMousePosition
                 return
             else
@@ -900,12 +923,45 @@ retry:
             SendEvent("{RButton down}") ; SendInput sometimes shifts the mouse before sending rbutton down with the game
             ; if the user moves the mouse too quickly when relocking the camera.
             BlockInput "MouseMoveOff"
+            if this.ShowDot
+                this.DrawDot(Window_Width * 0.5, Window_Height * this._lockAxysLevel, "FF0000", 2)
         }
     }
 
     isCameraLocked()
     {
         return this._cameraLocked
+    }
+
+    ; Method to create a dot overlay
+    DrawDot(x, y, color := "FF0000", size := 2)
+    {
+        if (this._overlayGui != "")
+            this.RemoveDot() ; Remove previous dot
+
+        if (size < 1)
+            size := 1
+
+        ; Create GUI
+        overlay := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale")
+        overlay.BackColor := color
+
+        ; Make the window click-through
+        WinSetTransparent(200, overlay)
+        WinSetExStyle("+0x20", overlay) ; WS_EX_TRANSPARENT - click-through
+
+        ; Small square for single pixel
+        overlay.Show(Format("x{} y{} w{} h{} NoActivate", x, y, size, size))
+        this._overlayGui := overlay
+    }
+
+    ; Remove all dots
+    RemoveDot()
+    {
+        if this._overlayGui == ""
+            return
+        this._overlayGui.Destroy()
+        this._overlayGui := ""
     }
 }
 
@@ -1237,6 +1293,7 @@ class WinHook
     }
 }
 
+; -----------------------------------------------
 ; .. TESTS ..
 ; uhmm PixelGetColor is slower than ImageSearch if we compare more than 2 pixels... uhmm autohotkey doesn't do this right
 /*
@@ -1280,6 +1337,7 @@ F9::
 }
 */
 
+; Debugging hotkeys
 F8::
 {
     if (!vrObj.isMemValid())
