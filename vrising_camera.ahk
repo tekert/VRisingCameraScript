@@ -4,6 +4,10 @@
 
 ; CHANGELOG
 
+; v0.9.7
+; Added support for v1.1.9.0 (will not work on older saves pre v1.1)
+; Added a dot on the center of the screen when the camera is locked, useful to know where the mouse is locked.
+
 ; ver 0.9.6
 ; Added support for version v1.1.8.0 (will not work on older saves pre v1.1)
 
