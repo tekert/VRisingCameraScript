@@ -86,8 +86,8 @@ showDot := False
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
 ; Tested from [1.1.9.0] to [v1.1.9.0]
 menuModuleName := "UnityPlayer.dll"
-menuModuleOffset := 0x01CF7AC0
-menuModulePointerOffsets := [0x238, 0x268, 0x530, 0x20, 0x18]
+menuModuleOffset := 0x01D09AD8
+menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ; NOTE:
 ; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05
 ; (mark Hex and put 05), finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
