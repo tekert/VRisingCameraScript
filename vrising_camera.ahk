@@ -4,7 +4,7 @@
 
 ; CHANGELOG
 ; v0.9.9
-; Added alterantive menu adress detection to reduce false positives. (testing, seems stable)
+; Added alternative menu address detection to reduce false positives. (testing, seems stable)
 
 ; v0.9.8
 ; Updated to more stable pointer offsets for menu detection.
@@ -96,7 +96,7 @@ menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01D09AD8
 menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 
-; Alternative zone 3 (used when the game is loaded, to reduce false positives, also for testing)
+; Alternative zone 3 (used when the game is loaded, to help reduce false positives, beta)
 menuModuleName2 := "UnityPlayer.dll"
 menuModuleOffset2 := 0x01CF9C90
 menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
@@ -126,7 +126,7 @@ menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
 ; zone 2 sometimes uses 0x19 when you enter arena or someone dies near you.
 ;
 ; Zone:                   1           2           3           4
-;                                                             This zone
+;
 ; Action camera:          --          00000018    00000000    0000000F (from 0x0F (no buff) to 0x17 (full buffs, summons, etc))
 ; arena build:                        0000001B    00000129    0000000F
 ; TAB menu:               --          0000001A    00000101    00000058
@@ -139,7 +139,7 @@ menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
 ; K menu:                 --          0000001A    00000117    0000006D
 ; ctrl/alt menu:                                  00000000    0000001B
 ;
-; (main menu before entering a world)
+; (main menu before loading world)
 ; Main menu:                          00000005    --------    00000015
 ; Cinematic playing                   00000003    --------    00000003
 ; Config menu:                        00000004    --------    0000004C
@@ -343,25 +343,6 @@ $LAlt Up::
     vrObj.ResumeScript()
 }
 
-; ; Unlock the mouse when using abilities that require area target, like throwing abilities.
-; #HotIf vrObj.isCameraLocked()
-; $e::
-; {
-;     vrObj.PauseScript()
-;     SendEvent("{e}")
-;     Sleep(700) ; maximun delay for skill cast, 700ms is enough for all abilities
-;     vrObj.ResumeScript()
-; }
-
-; #HotIf vrObj.isCameraLocked()
-; $c::
-; {
-;     vrObj.PauseScript()
-;     SendEvent("{c}")
-;     Sleep(700) ; maximun delay for skill cast, 700ms is enough for all abilities
-;     vrObj.ResumeScript()
-; }
-
 ; Keyboard for console
 ;SC029:: ; This is the key above "TAB" left of "1"
 F4:: ; <- put here your favorite key to open the console, we use the default SC029
@@ -402,7 +383,7 @@ class VRising
     _hProcess := ""         ; HANDLE of the vrising.exe process               (not used if using pixel scans)
     _vrisingMem := ""       ; _ClassMemory Object                             (not used if using pixel scans)
     _menuAddress := 0       ; Memory address to check for overlay menus       (not used if using pixel scans)
-    _menuAddressAlt := 0       ; Memory address to check for overlay menus (alternative version, used when the game is loaded, not in start menu)
+    _menuAddressAlt := 0    ; To reduce false positives (alternative version, used when the game is loaded, not in start menu)
     _pitchAOB := ""
     _pitchAOBOffset := 0x0   ; Offset for the AOB pattern
     _winHooksArray := []
@@ -740,7 +721,7 @@ retry:
     }
 
     ; Method:   _getAddress()
-    ;            Get the base address
+    ;            Get the base address of the module offsets
     ;            Memory Address are returned as an int decimal
     ; Return values:
     ;   Positive integer - The menu/overlay state address (success).
@@ -784,7 +765,7 @@ retry:
     }
 
     ; Method:   _getMenuAddressAlt()
-    ;            Get the alternative menu address, used when the game is loaded, not in start menu.
+    ;            Get the alternative menu address, valid only the game is loaded.
     ;            Memory Address are returned as an int decimal
     ; Return values:
     ;   Positive integer - The alternative menu/overlay state address (success).
@@ -796,10 +777,10 @@ retry:
 
         menuAddressAlt := this._getAddress(this._menuModuleName2, this._menuModuleOffset2, this._menuModulePointerOffsets2*
         )
-        if ((menuAddressAlt != "") and (menuAddressAlt > 0))
+        if menuAddressAlt
             return menuAddressAlt
 
-        return "" ; Not found
+        return "" ; Not found, do nothing, this is not an error, the game is not loaded.
     }
 
     ; Return Values:
@@ -815,15 +796,15 @@ retry:
             if (!this.isMemValid())
                 throw Error("Handle is no longer valid, can't check if menu is open")
 
-            uint := ""
-            uintAlt := ""
+            value := ""
+            valueAlt := ""
             ret := True
 
             if (this._menuAddress != "" and this._menuAddress > 0)
             {
-                uint := this._vrisingMem.read(this._menuAddress, "UInt") ; We can read from offsets here but better to use the cached menuAddress.
-                ; Error
-                if (uint = "")
+                ; Use the cached menuAddress.
+                value := this._vrisingMem.read(this._menuAddress, "UInt")
+                if (value == "")  ; Error, 0 is a valid value
                 {
                     if this._vrisingMem.ErrorLevel == -2
                         throw Error("Wrong type passed to _vrisingMem.read() method")
@@ -832,11 +813,13 @@ retry:
                 }
 
                 ; Get the alternative menu address (testing), created when the game is loaded
-                this._menuAddressAlt := this._getMenuAddressAlt()
-                if (this._menuAddressAlt != "" and this._menuAddressAlt > 0)
+                if (!this._menuAddressAlt)
+                    this._menuAddressAlt := this._getMenuAddressAlt()
+
+                if this._menuAddressAlt
                 {
-                    uintAlt := this._vrisingMem.read(this._menuAddressAlt, "UInt")
-                    if (uintAlt = "")
+                    valueAlt := this._vrisingMem.read(this._menuAddressAlt, "UInt")
+                    if (valueAlt == "") ; Error, 0 is a valid value
                     {
                         if this._vrisingMem.ErrorLevel == -2
                             throw Error("Wrong type passed to _vrisingMem.read() method")
@@ -845,16 +828,17 @@ retry:
                     }
                 }
 
-                ; If we have the alternative menu address (game world is loaded), check it
-                if (uintAlt != "")
+                ; If we have the alternative address (game world is loaded), check it
+                if (valueAlt != "")
                 {
-                    if (uintAlt == 0x00) and (uint == 0x18 or uint == 0x19)
+                    ; uint == 0x19 when we walk over an arena block or someone dies in world map near you.
+                    if (valueAlt == 0x00) and (value == 0x18 or value == 0x19)
                         ret := False
                 }
                 else
                 {
                     ; Has some false positives, on arenas and when someone dies in world map near you.
-                    if (uint == 0x18)
+                    if (value == 0x18)
                         ret := False
                 }
             }
