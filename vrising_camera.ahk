@@ -1,8 +1,12 @@
 ; VRising mouse lock script (improves aim and reaction times for some people)
 ; https://github.com/tekert/VRisingCameraScript/
-; v0.9.7
+; v0.9.8
 
 ; CHANGELOG
+
+; v0.9.8
+; Updated to more stable pointer offsets for menu detection.
+; Unlock the camera when using E and C skill (keys that require area target on some weapons/magic combos)
 
 ; v0.9.7
 ; Added support for v1.1.9.0 (will not work on older saves pre v1.1)
@@ -86,17 +90,63 @@ showDot := False
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
 ; Tested from [1.1.9.0] to [v1.1.9.0]
 menuModuleName := "UnityPlayer.dll"
-menuModuleOffset := 0x01D09AD8
-menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
-; NOTE:
-; To find the menuAddress manually, go to main menu (not ESC menu but main menu), Using CheatEngine search for a byte value of 0x05
-; (mark Hex and put 05), finally go to the cinematic menu, play a cinematic and while it's playing search for 0x03
-; Repeat multiple times until one value remains.
-; (optionally go to Load menu and search for 0x04)
+menuModuleOffset := 0x01CF9C90
+menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
+
+; zone 2:
+menuModuleName2 := "UnityPlayer.dll"
+menuModuleOffset2 := 0x01D09AD8
+menuModulePointerOffsets2 := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ;
-; That is your menuAddress, now repeat this a bunch of times after closing/start the game, generating pointer maps each time.
-; after 2 or 3 times, scan and compare the prior pointer scans against the current most recent scan and pick some pointers
-; from UnityPlayer.dll.
+; POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
+; There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
+;
+; New memory regions as of v1.1.9.0+:
+;
+; Zone 4 v1.1.9.0:
+; menuModuleName := "UnityPlayer.dll"
+; menuModuleOffset := 0x01CF8C80
+; menuModulePointerOffsets := [0x738, 0x8]
+;
+; Zone 3 v1.1.9.0: (needs testing)
+; menuModuleName := "UnityPlayer.dll"
+; menuModuleOffset := 0x01CF9C90
+; menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
+;
+; zone 2: v1.1.9.0:
+; menuModuleName := "UnityPlayer.dll"
+; menuModuleOffset := 0x01D09AD8
+; menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
+;
+; Zone:                   1           2           3           4
+;                                                             This zone
+; First Scan (action):    --          00000000    00000000    0000000F
+; Action camera:          --          00000018    00000000    0000000F (from 0x0F (no buff) to 0x17 (full buffs, summons, etc))
+; arena build:                        0000001B    00000129    0000000F
+; TAB menu:               --          0000001A    00000101    00000058
+; ESC menu:               --          00000019    00000117    00000012
+; MAP:                    --          0000001B    00000117    0000000A
+; Build menu:             --          0000001B    00000101    00000017
+; Chest open:             --          00000019    00000103    00000086
+; building gemcut:                    00000019    00000106    00000076
+; building gem:                       00000019    0000011D    0000006F
+; K menu:                 --          0000001A    00000117    0000006D
+; ctrl/alt menu:                                  00000000    0000001B
+;
+; (main menu before entering a world)
+; Main menu:                          00000005    00000000    00000015
+; Cinematic playing                   00000003    00000000    00000003
+; Config menu:                        00000004    00000000    0000004C
+; Play menu;                                      00000000    00000007
+
+; NOTE:
+; To find the menuAddress manually, enter a game world, Using CheatEngine search for the byte value (example 101)
+; (mark Hex and put 101), open tab inventory menu and search, next for esc (example 117) that is the address of the menu state byte.
+;
+; Now repeat this a bunch of times after closing/start the game, generating pointer maps each time.
+; after 2 or 3 times, scan and compare the prior pointer scans (pointer depth of 5 is fine for this one)
+;  against the current most recent scan and pick some pointers from UnityPlayer.dll instead of Gameassembly.dll
+; (changes less often).
 
 ; Pitch cameraState structure
 ; This value gets created dynamically each time a world is loaded, the final value of the pitch is always a float = 0,6632251143 or AOB = 1F C9 29 3F little endian
@@ -230,14 +280,14 @@ vrObj.showDot := showDot
 ; Temporarily disables auto mouse lock when shift is pressed.
 $LShift::
 {
-    vrObj.DisableScanTimer()
+    vrObj.PauseScript()
     SendEvent("{Lshift down}")
 }
 
 $LShift Up::
 {
     SendEvent("{Lshift up}")
-    vrObj.EnableScanTimer()
+    vrObj.ResumeScript()
 }
 
 ; Play nicely with real right mouse clicks when this script is enabled.
@@ -265,30 +315,48 @@ RButton Up::
 ; Action wheel
 $Ctrl::
 {
-    vrObj.DisableScanTimer() ; key spam is controlled inside this function.
+    vrObj.PauseScript() ; key spam is controlled inside this function.
     SendEvent("{Ctrl down}")
 }
 $Ctrl Up::
 {
     SendEvent("{Ctrl up}")
-    vrObj.EnableScanTimer()
+    vrObj.ResumeScript()
 }
 
 ; Emote Wheel
 $LAlt::
 {
-    vrObj.DisableScanTimer() ; key spam is controlled inside this function.
+    vrObj.PauseScript() ; key spam is controlled inside this function.
     SendEvent("{LAlt down}")
 }
 $LAlt Up::
 {
     SendEvent("{LAlt up}")
-    vrObj.EnableScanTimer()
+    vrObj.ResumeScript()
 }
+
+; ; Unlock the mouse when using abilities that require area target, like throwing abilities.
+; #HotIf vrObj.isCameraLocked()
+; $e::
+; {
+;     vrObj.PauseScript()
+;     SendEvent("{e}")
+;     Sleep(700) ; maximun delay for skill cast, 700ms is enough for all abilities
+;     vrObj.ResumeScript()
+; }
+
+; #HotIf vrObj.isCameraLocked()
+; $c::
+; {
+;     vrObj.PauseScript()
+;     SendEvent("{c}")
+;     Sleep(700) ; maximun delay for skill cast, 700ms is enough for all abilities
+;     vrObj.ResumeScript()
+; }
 
 ; Keyboard for console
 ;SC029:: ; This is the key above "TAB" left of "1"
-
 F4:: ; <- put here your favorite key to open the console, we use the default SC029
 {
     Send '{U+0060}' ;"`" <- back accent: https://kbdlayout.info/how/%60
@@ -489,7 +557,7 @@ retry:
     ; Disable Timers and close Memory instance
     _closeMemory()
     {
-        this.DisableScanTimer()
+        this.PauseScript()
 
         this._vrisingMem := ""
         this._hProcess := "" ; Is closed automatically when the _classMemory object is destroyed so it's invalid now, we delete it.
@@ -661,21 +729,7 @@ retry:
     ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
     ;
     /*  --------
-        POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
-        There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
     
-        ["UnityPlayer.dll"+01CEE8E8]+B8]+0]+B0]+F0]+40]+20]+18 = byte value based on which menu is open
-    
-        Byte values in game as of v1.1.8.0 [16/5/25]:
-        0x18 = action camera with no menus (no inv, loot, build, plant) open
-        0x1A = TAB menu, K, J open
-        0x19 = ESC menu open
-        0x1B = Map menu open
-    
-        Byte values in Main Menu:
-        0x05 = Main Menu
-        0x03 = Cinematic
-        0x04 = Options - Play menu - Load game
     */
     _getMenuAddress()
     {
@@ -733,13 +787,13 @@ retry:
             if (!this.isMemValid())
                 throw Error("Handle is no longer valid, can't check if menu is open")
 
-            byte := 0
+            uint := 0
             if (this._menuAddress != "" and this._menuAddress > 0)
             {
-                byte := this._vrisingMem.read(this._menuAddress, "UChar") ; We can read from offsets here but better to use the cached menuAddress.
+                uint := this._vrisingMem.read(this._menuAddress, "UInt") ; We can read from offsets here but better to use the cached menuAddress.
 
                 ; Error
-                if (byte = "")
+                if (uint = "")
                 {
                     if this._vrisingMem.ErrorLevel == -2
                         throw Error("Wrong type passed to _vrisingMem.read() method")
@@ -747,8 +801,19 @@ retry:
                     throw OSError()
                 }
 
-                ;! TODO: when a clan member dies, this no longer works until the player respawns or time passes, investigate.
-                if (byte != 0x18) ; 0x18 = means we are fully in action camera v1.1.8.0
+                ; ; v1.1.9.0 zone 4 values:
+                ; if (uint != 0x0F and
+                ;     uint != 0x10 and
+                ;     uint != 0x11 and
+                ;     uint != 0x12 and
+                ;     uint != 0x13 and
+                ;     uint != 0x14 and
+                ;     uint != 0x15 and
+                ;     uint != 0x16)
+                ;     return True
+
+                ; v1.1.9.0 zone 3 values:
+                if (uint != 0x00)
                     return True
             }
         }
@@ -814,7 +879,7 @@ retry:
 
                 Suspend(1)
             }
-            this.DisableScanTimer()
+            this.PauseScript()
         }
         else
         {
@@ -826,30 +891,30 @@ retry:
 
                 Suspend(0)
             }
-            this.EnableScanTimer() ; enable scan timer even if the script is not suspended, cold start.
+            this.ResumeScript() ; enable scan timer even if the script is not suspended, cold start.
         }
     }
 
-    ; Disable the menu scan timer and unlocks the camera (called internally when suspending the script)
+    ; Disable the menu scan timer and unlock the camera (called internally when suspending the script)
     ; Not interruptable by timers
-    DisableScanTimer()
+    PauseScript()
     {
         if (!this._timerDisabled)
         {
             SetTimer(this._scanMenusFunc, 0) ; Delete timer
             this._timerDisabled := true
-            this.UnlockCamera()
+            this._unlockCamera()
         }
     }
 
     ; Called internally when resuming the script from suspension
     ; Not interruptable by timers
-    EnableScanTimer()
+    ResumeScript()
     {
         if (this._timerDisabled)
         {
             this._timerDisabled := false
-            ;this.LockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
+            ;this._lockCamera() ; Timer will lock or unlock the camera, don't force it. maybe the player is already on a menu.
             Thread "NoTimers", False
             SetTimer(this._scanMenusFunc, scanMenuInterval, 0)
             Thread "NoTimers", True
@@ -870,27 +935,27 @@ retry:
             if (menuOpen)
             {
                 if (this._cameraLocked)
-                    this.UnlockCamera() ; execute this line only the first time
+                    this._unlockCamera() ; execute this line only the first time
                 ; (we want to use real right clicks on build menu and this executes every <scanMenuInterval>)
             }
             else
             {
                 if (!this._cameraLocked)
-                    this.LockCamera()
+                    this._lockCamera()
             }
 
         }
         catch Error
         {
             ; MsgBox "Error in _ScanMenusTimer: " Error.Number, Error.Message ; Debug
-            this.UnlockCamera()
+            this._unlockCamera()
             return ; the memory handle is not valid or some other problem
             ; TODO: send a notification to the logs instead of MsgBox.
         }
     }
 
     ; SendEvents are more reliable, no need to Sleep everywhere.
-    UnlockCamera()
+    _unlockCamera()
     {
         if (GetKeyState("RButton"))
         {
@@ -904,7 +969,7 @@ retry:
         }
     }
 
-    LockCamera()
+    _lockCamera()
     {
         if (this._timerDisabled) ; Don't lock if we disabled camera lock (thread may be resumed late)
             return
@@ -1353,8 +1418,20 @@ F8::
     byte := ""
     menuAddress := vrObj._menuAddress
     byte := vrObj._vrisingMem.read(menuAddress, "UChar") ; We can read from offsets here but better to cache the final menuAddress.
-    MsgBox "F2: byte: " byte
-
+    ; Write the byte variable as a hex string
+    if (byte != "")
+    {
+        hexByte := Format("{:02X}", byte)
+        MsgBox "F2: byte in hex: " hexByte
+    }
+    else
+    {
+        MsgBox "F2: Failed to read byte from address: " menuAddress
+        if (vrObj._vrisingMem.ErrorLevel = -2)
+            MsgBox "F2: Wrong type passed to _vrisingMem.read() method"
+        else
+            MsgBox "F2: OSError()"
+    }
 }
 
 /*
