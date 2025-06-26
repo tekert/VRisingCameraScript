@@ -99,7 +99,7 @@ menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ; Alternative zone 3 (used when the game is loaded, to help reduce false positives, beta)
 menuModuleName2 := "UnityPlayer.dll"
 menuModuleOffset2 := 0x01CF9C90
-menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
+menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
 ; POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
 ; There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
@@ -114,7 +114,7 @@ menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
 ; Zone 3 v1.1.9.0: (only works when game is loaded, not in start menu)
 ; menuModuleName := "UnityPlayer.dll"
 ; menuModuleOffset := 0x01CF9C90
-; menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
+; menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
 ; zone 2: v1.1.9.0:
 ; menuModuleName := "UnityPlayer.dll"
@@ -791,6 +791,7 @@ retry:
     ;   throws on error.
     isMenuOpen()
     {
+        ret := True
         if (this._useMemScan)
         {
             if (!this.isMemValid())
@@ -798,7 +799,6 @@ retry:
 
             value := ""
             valueAlt := ""
-            ret := True
 
             if (this._menuAddress != "" and this._menuAddress > 0)
             {
@@ -832,7 +832,7 @@ retry:
                 if (valueAlt != "")
                 {
                     ; uint == 0x19 when we walk over an arena block or someone dies in world map near you.
-                    if (valueAlt == 0x00) and (value == 0x18 or value == 0x19)
+                    if ((valueAlt == 0x0) and ((value == 0x18) or (value == 0x19)))
                         ret := False
                 }
                 else
@@ -1441,22 +1441,27 @@ F8::
         return
     }
 
-    byte := ""
     menuAddress := vrObj._menuAddress
-    byte := vrObj._vrisingMem.read(menuAddress, "UChar") ; We can read from offsets here but better to cache the final menuAddress.
-    ; Write the byte variable as a hex string
-    if (byte != "")
+    value := vrObj._vrisingMem.read(menuAddress, "UChar")
+    valueAlt := vrObj._vrisingMem.read(vrObj._menuAddressAlt, "UInt")
+    if (value != "")
     {
-        hexByte := Format("{:02X}", byte)
-        MsgBox "F2: byte in hex: " hexByte
+        hexByte := Format("{:08X}", value)
+        hexByteAlt := Format("{:08X}", valueAlt)
+        hexAddress := Format("{:X}", menuAddress)
+        hexAddressAlt := Format("{:X}", vrObj._menuAddressAlt)
+        MsgBox "F8: byte in hex: " hexByte " at address: " hexAddress "`n"
+            . "F8: alt byte in hex: " hexByteAlt " at address: " hexAddressAlt "`n"
+            . "F8: dec value is: " value "`n"
+            . "F8: dec valueAlt is: " valueAlt
     }
     else
     {
-        MsgBox "F2: Failed to read byte from address: " menuAddress
+        MsgBox "F8: Failed to read byte from address: " menuAddress
         if (vrObj._vrisingMem.ErrorLevel = -2)
-            MsgBox "F2: Wrong type passed to _vrisingMem.read() method"
+            MsgBox "F8: Wrong type passed to _vrisingMem.read() method"
         else
-            MsgBox "F2: OSError()"
+            MsgBox "F8: OSError()"
     }
 }
 

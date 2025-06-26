@@ -1,5 +1,5 @@
 [Autohotkey](https://www.autohotkey.com/download/ahk-v2.exe) script to automatically lock the camera behind de player on VRising (Windows)  
-Uses memory or pixel detection to check when to unhide the mouse.
+Uses memory detection to check when to unhide the mouse.
 Also has some quality of life features like changing the pitch of the camera or making more complex hotkeys.
 
 # Install
