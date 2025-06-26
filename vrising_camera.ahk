@@ -1,8 +1,10 @@
 ; VRising mouse lock script (improves aim and reaction times for some people)
 ; https://github.com/tekert/VRisingCameraScript/
-; v0.9.8
+; v0.9.9
 
 ; CHANGELOG
+; v0.9.9
+; Added alterantive menu adress detection to reduce false positives. (testing, seems stable)
 
 ; v0.9.8
 ; Updated to more stable pointer offsets for menu detection.
@@ -89,26 +91,27 @@ showDot := False
 ; (Address will be cached and scanned every scanMenuInterval to check the current state of menus ingame)
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
 ; Tested from [1.1.9.0] to [v1.1.9.0]
+; zone 2
 menuModuleName := "UnityPlayer.dll"
-menuModuleOffset := 0x01CF9C90
-menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
+menuModuleOffset := 0x01D09AD8
+menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 
-; zone 2:
+; Alternative zone 3 (used when the game is loaded, to reduce false positives, also for testing)
 menuModuleName2 := "UnityPlayer.dll"
-menuModuleOffset2 := 0x01D09AD8
-menuModulePointerOffsets2 := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
+menuModuleOffset2 := 0x01CF9C90
+menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
 ;
 ; POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
 ; There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
 ;
 ; New memory regions as of v1.1.9.0+:
 ;
-; Zone 4 v1.1.9.0:
+; Zone 4 v1.1.9.0: (problematic, seems to indicate overlay actions)
 ; menuModuleName := "UnityPlayer.dll"
 ; menuModuleOffset := 0x01CF8C80
 ; menuModulePointerOffsets := [0x738, 0x8]
 ;
-; Zone 3 v1.1.9.0: (needs testing)
+; Zone 3 v1.1.9.0: (only works when game is loaded, not in start menu)
 ; menuModuleName := "UnityPlayer.dll"
 ; menuModuleOffset := 0x01CF9C90
 ; menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x18, 0x10, 0x548, 0x1C8]
@@ -118,9 +121,12 @@ menuModulePointerOffsets2 := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ; menuModuleOffset := 0x01D09AD8
 ; menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ;
+; v1.1.9.0:
+; Currently using a combination of zone 2 (values 0x18 and 0x19) and zone 3 (value 0x00) for the menu state.
+; zone 2 sometimes uses 0x19 when you enter arena or someone dies near you.
+;
 ; Zone:                   1           2           3           4
 ;                                                             This zone
-; First Scan (action):    --          00000000    00000000    0000000F
 ; Action camera:          --          00000018    00000000    0000000F (from 0x0F (no buff) to 0x17 (full buffs, summons, etc))
 ; arena build:                        0000001B    00000129    0000000F
 ; TAB menu:               --          0000001A    00000101    00000058
@@ -134,11 +140,11 @@ menuModulePointerOffsets2 := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ; ctrl/alt menu:                                  00000000    0000001B
 ;
 ; (main menu before entering a world)
-; Main menu:                          00000005    00000000    00000015
-; Cinematic playing                   00000003    00000000    00000003
-; Config menu:                        00000004    00000000    0000004C
-; Play menu;                                      00000000    00000007
-
+; Main menu:                          00000005    --------    00000015
+; Cinematic playing                   00000003    --------    00000003
+; Config menu:                        00000004    --------    0000004C
+; Play menu;                                      --------    00000007
+;
 ; NOTE:
 ; To find the menuAddress manually, enter a game world, Using CheatEngine search for the byte value (example 101)
 ; (mark Hex and put 101), open tab inventory menu and search, next for esc (example 117) that is the address of the menu state byte.
@@ -225,7 +231,8 @@ Thread "NoTimers", True
 
 ; Create the main object, this will handle everything
 vrObj := VRising("VRising.exe", useMemScan)
-vrObj.setMenuAddresses(menuModuleName, menuModuleOffset, menuModulePointerOffsets)
+vrObj.setPointers(menuModuleName, menuModuleOffset, menuModulePointerOffsets)
+vrObj.setPointersAlt(menuModuleName2, menuModuleOffset2, menuModulePointerOffsets2)
 vrObj.restoreMousePosition := restoreMousePosition
 vrObj.setPitchAOB(pitchAOB, pitchOffset)
 vrObj.lockAxysLevel := lockMouseOnYaxis
@@ -263,7 +270,7 @@ vrObj.showDot := showDot
     }
 }
 
-; F3: Remove all dots and disable the dot on the center of the screen.
+; F6: Remove all dots and disable the dot on the center of the screen.
 ~F6::
 {
     vrObj.showDot := False
@@ -395,13 +402,14 @@ class VRising
     _hProcess := ""         ; HANDLE of the vrising.exe process               (not used if using pixel scans)
     _vrisingMem := ""       ; _ClassMemory Object                             (not used if using pixel scans)
     _menuAddress := 0       ; Memory address to check for overlay menus       (not used if using pixel scans)
+    _menuAddressAlt := 0       ; Memory address to check for overlay menus (alternative version, used when the game is loaded, not in start menu)
     _pitchAOB := ""
     _pitchAOBOffset := 0x0   ; Offset for the AOB pattern
     _winHooksArray := []
     _timerDisabled := True  ; Enable or disable auto lock with F1 key (also used internally to disable the script when shift or etc)
     _cameraLocked := False  ; True when the camera is currently locked by the script (used to play nicely with real right mouse clicks on menus)
     _isInFocus := ""
-    _menuModuleName := ""                   ; Module name of where the menu state pointer is stored.
+    _menuModuleName := ""               ; Module name of where the menu state pointer is stored.
     _menuModuleOffset := 0              ; Module offset where the menu state pointer is inside the module
     _menuModulePointerOffsets := []     ; Array of offsets in order from pointer scans.
     _useMemScan := True
@@ -533,7 +541,7 @@ class VRising
 
 retry:
         this._openMemory()
-        menuAddress := this._getMenuAddress()
+        menuAddress := this._getAddress(this._menuModuleName, this._menuModuleOffset, this._menuModulePointerOffsets*)
         if ((menuAddress = "") or (menuAddress <= 0))
         {
             ; An Error, wait more before trying again.
@@ -562,6 +570,7 @@ retry:
         this._vrisingMem := ""
         this._hProcess := "" ; Is closed automatically when the _classMemory object is destroyed so it's invalid now, we delete it.
         this._menuAddress := 0
+        this._menuAddressAlt := 0
 
         this._savedXpos := ""
         this._savedYpos := ""
@@ -597,7 +606,7 @@ retry:
     }
 
     ; This is used to set the module name and offsets where the menu state is stored.
-    setMenuAddresses(menuModuleName := "", menuModuleOffset := 0, menuModulePointerOffsets := [])
+    setPointers(menuModuleName := "", menuModuleOffset := 0, menuModulePointerOffsets := [])
     {
         if (menuModuleName = "")
             throw ValueError("Please provide a valid menuModuleName to search for")
@@ -605,6 +614,18 @@ retry:
         this._menuModuleName := menuModuleName
         this._menuModuleOffset := menuModuleOffset
         this._menuModulePointerOffsets := menuModulePointerOffsets
+    }
+
+    ; Alternative address (used when the game is loaded, not in start menu)
+    setPointersAlt(menuModuleName2 := "", menuModuleOffset2 := 0, menuModulePointerOffsets2 := [])
+    {
+        if (menuModuleName2 = "")
+            throw ValueError("Please provide a valid menuModuleName to search for")
+
+        this._menuModuleName2 := menuModuleName2
+        this._menuModuleOffset2 := menuModuleOffset2
+        this._menuModulePointerOffsets2 := menuModulePointerOffsets2
+
     }
 
     setPitchAOB(pitchAOB, pitchAOBOffset := 0x0)
@@ -718,8 +739,8 @@ retry:
         return pitchAddress
     }
 
-    ; Method:   _getMenuAddress()
-    ;            Get the base address of the open/close state of game menus
+    ; Method:   _getAddress()
+    ;            Get the base address
     ;            Memory Address are returned as an int decimal
     ; Return values:
     ;   Positive integer - The menu/overlay state address (success).
@@ -728,27 +749,21 @@ retry:
     ;   -4  - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
     ;   -99 - Invalid handle or _ClassMemory Object, reopen handle and try again
     ;
-    /*  --------
-    
-    */
-    _getMenuAddress()
+    _getAddress(moduleName, moduleOffset, modulePointerOffsets*)
     {
         if (!this.isMemValid())
             return -99
-
-        if ((this._menuAddress != "") and (this._menuAddress > 0))
-            return this._menuAddress
 
         ; Positive integer -The menu/overlay state address (success).
         ;   -1 - Module not found
         ;   -3 - EnumProcessModulesEx failed
         ;   -4 - The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed.
-        moduleBaseAddress := this._vrisingMem.getModuleBaseAddress(this._menuModuleName)
+        moduleBaseAddress := this._vrisingMem.getModuleBaseAddress(moduleName)
         if (moduleBaseAddress < 0)
         {
             switch moduleBaseAddress
             {
-                case -1: MsgBox "Module " this._menuModuleName " not found"
+                case -1: MsgBox "Module " moduleName " not found"
                 case -3: MsgBox "EnumProcessModulesEx failed"
                 case -4: MsgBox "The AHK script is 32 bit and you are trying to access the modules of a 64 bit target process. Or the target process has been closed."
             }
@@ -757,13 +772,7 @@ retry:
         ret := ""
         try
         {
-            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + this._menuModuleOffset,
-                this._menuModulePointerOffsets*)
-            if (ret = "" or ret <= 0)
-            {
-                ; TODO: url for issues.
-                MsgBox "Could not get menu pointer address, maybe UnityPlayer.dll changed, report it on GitHub, ret: " ret
-            }
+            ret := this._vrisingMem.getAddressFromOffsets(moduleBaseAddress + moduleOffset, modulePointerOffsets*)
         }
         catch Error as err
         {
@@ -772,6 +781,25 @@ retry:
         }
 
         return ret
+    }
+
+    ; Method:   _getMenuAddressAlt()
+    ;            Get the alternative menu address, used when the game is loaded, not in start menu.
+    ;            Memory Address are returned as an int decimal
+    ; Return values:
+    ;   Positive integer - The alternative menu/overlay state address (success).
+    ;   ""  - Module not found
+    _getMenuAddressAlt()
+    {
+        if ((this._menuAddressAlt != "") and (this._menuAddressAlt > 0))
+            return this._menuAddressAlt
+
+        menuAddressAlt := this._getAddress(this._menuModuleName2, this._menuModuleOffset2, this._menuModulePointerOffsets2*
+        )
+        if ((menuAddressAlt != "") and (menuAddressAlt > 0))
+            return menuAddressAlt
+
+        return "" ; Not found
     }
 
     ; Return Values:
@@ -787,11 +815,13 @@ retry:
             if (!this.isMemValid())
                 throw Error("Handle is no longer valid, can't check if menu is open")
 
-            uint := 0
+            uint := ""
+            uintAlt := ""
+            ret := True
+
             if (this._menuAddress != "" and this._menuAddress > 0)
             {
                 uint := this._vrisingMem.read(this._menuAddress, "UInt") ; We can read from offsets here but better to use the cached menuAddress.
-
                 ; Error
                 if (uint = "")
                 {
@@ -801,20 +831,32 @@ retry:
                     throw OSError()
                 }
 
-                ; ; v1.1.9.0 zone 4 values:
-                ; if (uint != 0x0F and
-                ;     uint != 0x10 and
-                ;     uint != 0x11 and
-                ;     uint != 0x12 and
-                ;     uint != 0x13 and
-                ;     uint != 0x14 and
-                ;     uint != 0x15 and
-                ;     uint != 0x16)
-                ;     return True
+                ; Get the alternative menu address (testing), created when the game is loaded
+                this._menuAddressAlt := this._getMenuAddressAlt()
+                if (this._menuAddressAlt != "" and this._menuAddressAlt > 0)
+                {
+                    uintAlt := this._vrisingMem.read(this._menuAddressAlt, "UInt")
+                    if (uintAlt = "")
+                    {
+                        if this._vrisingMem.ErrorLevel == -2
+                            throw Error("Wrong type passed to _vrisingMem.read() method")
 
-                ; v1.1.9.0 zone 3 values:
-                if (uint != 0x00)
-                    return True
+                        throw OSError()
+                    }
+                }
+
+                ; If we have the alternative menu address (game world is loaded), check it
+                if (uintAlt != "")
+                {
+                    if (uintAlt == 0x00) and (uint == 0x18 or uint == 0x19)
+                        ret := False
+                }
+                else
+                {
+                    ; Has some false positives, on arenas and when someone dies in world map near you.
+                    if (uint == 0x18)
+                        ret := False
+                }
             }
         }
         else
@@ -852,7 +894,7 @@ retry:
             }
         }
 
-        return False
+        return ret
     }
 
     ; Suspends the script so that hotkeys are disabled temporarily, and pauses the scan timers too.
