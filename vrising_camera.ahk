@@ -90,19 +90,20 @@ showDot := False
 
 ; (Address will be cached and scanned every scanMenuInterval to check the current state of menus ingame)
 ; Array of pointer offsets taken from pointers maps where the menu state byte is stored:
-; Tested from [1.1.9.0] to [v1.1.9.0]
+; Tested from [1.1.9.0] to [v1.1.10.0]
 ; zone 2
 menuModuleName := "UnityPlayer.dll"
 menuModuleOffset := 0x01D09AD8
 menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 
 ; Alternative zone 3 (used when the game is loaded, to help reduce false positives, beta)
+; Tested from [1.1.10.0] to [v1.1.10.0]
 menuModuleName2 := "UnityPlayer.dll"
-menuModuleOffset2 := 0x01CF9C90
-menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
+menuModuleOffset2 := 0x01CFA220
+menuModulePointerOffsets2 := [0x4E8, 0x3C8, 0xB0, 0x18, 0x458, 0x140, 0x1C8]
 ;
-; POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often, GameAssembly.dll contains the actual game code and it changes every update)
-; There are like ~300 candidates inside this UnityEngine.dll, I chose the shortest path with the lower base address.
+; POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often,
+; GameAssembly.dll contains the actual game code and it changes every update)
 ;
 ; New memory regions as of v1.1.9.0+:
 ;
@@ -116,12 +117,17 @@ menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ; menuModuleOffset := 0x01CF9C90
 ; menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
+; Zone 3 v1.1.10.0: (only works when game is loaded, not in start menu)
+; menuModuleName2 := "UnityPlayer.dll"
+; menuModuleOffset2 := 0x01CFA220
+; menuModulePointerOffsets2 := [0x4E8, 0x3C8, 0xB0, 0x18, 0x458, 0x140, 0x1C8]
+;
 ; zone 2: v1.1.9.0:
 ; menuModuleName := "UnityPlayer.dll"
 ; menuModuleOffset := 0x01D09AD8
 ; menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ;
-; v1.1.9.0:
+; v1.1.10.0:
 ; Currently using a combination of zone 2 (values 0x18 and 0x19) and zone 3 (value 0x00) for the menu state.
 ; zone 2 sometimes uses 0x19 when you enter arena or someone dies near you.
 ;
@@ -151,7 +157,7 @@ menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
 ; Now repeat this a bunch of times after closing/start the game, generating pointer maps each time.
 ; after 2 or 3 times, scan and compare the prior pointer scans (pointer depth of 5 is fine for this one)
-;  against the current most recent scan and pick some pointers from UnityPlayer.dll instead of Gameassembly.dll
+;  against the current most recent scans and pick some pointers from UnityPlayer.dll instead of Gameassembly.dll
 ; (changes less often).
 
 ; Pitch cameraState structure
@@ -813,6 +819,7 @@ retry:
                 }
 
                 ; Get the alternative menu address (testing), created when the game is loaded
+                ; So we check it every time since we dont know if the game world is loaded or not.
                 if (!this._menuAddressAlt)
                     this._menuAddressAlt := this._getMenuAddressAlt()
 
@@ -821,6 +828,7 @@ retry:
                     valueAlt := this._vrisingMem.read(this._menuAddressAlt, "UInt")
                     if (valueAlt == "") ; Error, 0 is a valid value
                     {
+                        this._menuAddressAlt := "" ; Reset the address, game world reloaded.
                         if this._vrisingMem.ErrorLevel == -2
                             throw Error("Wrong type passed to _vrisingMem.read() method")
 
