@@ -99,8 +99,8 @@ menuModulePointerOffsets := [0x3B8, 0x4A8, 0x408, 0x20, 0x18]
 ; Alternative zone 3 (used when the game is loaded, to help reduce false positives, beta)
 ; Tested from [1.1.10.0] to [v1.1.10.0]
 menuModuleName2 := "UnityPlayer.dll"
-menuModuleOffset2 := 0x01CFA220
-menuModulePointerOffsets2 := [0x4E8, 0x3C8, 0xB0, 0x18, 0x458, 0x140, 0x1C8]
+menuModuleOffset2 := 0x01CF9C90
+menuModulePointerOffsets2 := [0xA18, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
 ; POINTERS (UnityEngine.dll: this contains the game 3d engine so it shouldn't change often,
 ; GameAssembly.dll contains the actual game code and it changes every update)
@@ -113,14 +113,14 @@ menuModulePointerOffsets2 := [0x4E8, 0x3C8, 0xB0, 0x18, 0x458, 0x140, 0x1C8]
 ; menuModulePointerOffsets := [0x738, 0x8]
 ;
 ; Zone 3 v1.1.9.0: (only works when game is loaded, not in start menu)
-; menuModuleName := "UnityPlayer.dll"
-; menuModuleOffset := 0x01CF9C90
-; menuModulePointerOffsets := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
+; menuModuleName2 := "UnityPlayer.dll"
+; menuModuleOffset2 := 0x01CF9C90
+; menuModulePointerOffsets2 := [0x9C8, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
 ; Zone 3 v1.1.10.0: (only works when game is loaded, not in start menu)
 ; menuModuleName2 := "UnityPlayer.dll"
-; menuModuleOffset2 := 0x01CFA220
-; menuModulePointerOffsets2 := [0x4E8, 0x3C8, 0xB0, 0x18, 0x458, 0x140, 0x1C8]
+; menuModuleOffset2 := 0x01CF9C90
+; menuModulePointerOffsets2 := [0xA18, 0x30, 0x40, 0x10, 0x18, 0xCF0, 0x98]
 ;
 ; zone 2: v1.1.9.0:
 ; menuModuleName := "UnityPlayer.dll"
